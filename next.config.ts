@@ -1,7 +1,13 @@
-import type { NextConfig } from "next";
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'export',          // Enables static export
+  basePath: '/law',          // <-- Subfolder path
+  assetPrefix: '/law/',      // <-- Ensures assets load correctly
 
-const nextConfig: NextConfig = {
-  /* config options here */
+  trailingSlash: true,       // Avoids 404 issues on Hostinger
+  images: {
+    unoptimized: true,       // Needed for static export if using next/image
+  },
 };
 
-export default nextConfig;
+module.exports = nextConfig;

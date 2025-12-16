@@ -1,3 +1,5 @@
-export default function HomePage() {
-  return <h1>Home page bro ✌️</h1>
+import HomePage from "@/app/home/page"
+export default function Home() {
+  
+  return <HomePage />
 }

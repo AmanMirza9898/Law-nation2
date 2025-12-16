@@ -22,7 +22,7 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="w-full bg-white shadow-sm border-b border-gray-200">
+      <nav className="w-full bg-white  shadow-sm border-b border-gray-200 navbar-font">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Left Side - Logo */}
@@ -38,7 +38,7 @@ export default function Navbar() {
                 <Link
                   key={item.name}
                   href={item.link}
-                  className={`px-4 py-2 text-gray-700 hover:text-red-600 transition-colors duration-200 ${
+                  className={`px-4 py-2 text-gray-900 hover:text-red-600 transition-colors duration-200 ${
                     pathname === item.link ? "text-red-600 font-medium" : ""
                   }`}
                 >
@@ -56,13 +56,13 @@ export default function Navbar() {
                 Create Account
               </Link>
               <Link
-                href="/sign-in"
+                href="/login"
                 className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors duration-200 font-medium flex items-center gap-1"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
-                Sign In
+                Login
               </Link>
             </div>
 
@@ -128,14 +128,14 @@ export default function Navbar() {
           {/* Mobile Actions */}
           <div className="border-t border-gray-200 p-4 space-y-3">
             <Link
-              href="/create-account"
+              href="/join-us"
               className="block w-full px-4 py-2.5 text-center bg-white text-red-600 border border-red-600 rounded-md hover:bg-red-50 transition-colors duration-200 font-medium"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Create Account
             </Link>
             <Link
-              href="/sign-in"
+              href="/login"
               className="block w-full px-4 py-2.5 text-center bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors duration-200 font-medium"
               onClick={() => setIsMobileMenuOpen(false)}
             >
