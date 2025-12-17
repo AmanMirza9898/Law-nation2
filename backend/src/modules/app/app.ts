@@ -1,7 +1,6 @@
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
-import dotenv from "dotenv";
 // import helmet from 'helmet';
 import cookieParser from "cookie-parser";
 import { nonExistingRoutesErrorHandler } from "@/error-handlers/non-existing-route.error-handler.js";
@@ -10,7 +9,6 @@ import { globalErrorHandler } from "@/error-handlers/global.error-handler.js";
 import AppRouter from "./app.route.js";
 
 // /src/app.ts
-dotenv.config();
 const app: express.Application = express();
 
 // app.use(helmet());
