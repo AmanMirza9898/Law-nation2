@@ -1,6 +1,5 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -25,6 +24,7 @@ model User {
 
   // RBAC relations
   roles       UserRole[]
+  refreshTokens          RefreshToken[]
   auditLogs  AuditLog[]
 }
 
@@ -92,3 +92,13 @@ model AuditLog {
   user User? @relation(fields: [userId], references: [id])
 }
 
+model RefreshToken {
+  id        String   @id @default(cuid())
+  tokenHash String
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  revoked   Boolean  @default(false)
+
+  user User @relation(fields: [userId], references: [id])
+}
