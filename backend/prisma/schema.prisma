@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// ==============================
+/// RBAC MODULE
+/// ==============================
+
+/// ---------- core user model ----------
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  phone        String?
+  passwordHash String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  version      Int      @default(1)
+
+  // RBAC relations
+  roles       UserRole[]
+  auditLogs  AuditLog[]
+}
+
+/// ---------- roles ----------
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+/// ---------- permissions ----------
+model Permission {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  description String?
+  module      String? // optional grouping (e.g. "leads", "inventory", "auth")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  roles RolePermission[]
+}
+
+/// ---------- user <-> role ----------
+model UserRole {
+  userId     String
+  roleId     String
+  assignedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+/// ---------- role <-> permission ----------
+model RolePermission {
+  roleId       String
+  permissionId String
+  assignedAt   DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+/// ---------- audit logging ----------
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  roleName   String? // snapshot of role at time of action
+  action     String  // e.g. "ROLE_ASSIGNED", "LOGIN", "PERMISSION_REVOKED"
+  resource   String  // e.g. "user", "role", "permission"
+  resourceId String?
+  payload    Json?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
