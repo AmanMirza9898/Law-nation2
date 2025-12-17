@@ -33,7 +33,6 @@ The backend follows a **modular, layered architecture** designed for long-term m
 
 ```
 src/
-├── app.ts                 # Express app configuration
 ├── index.ts               # Server bootstrap
 │
 ├── db/
