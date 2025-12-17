@@ -76,8 +76,8 @@ RBAC is fully normalized and scalable.
 ### 4.2 Running Migrations
 
 ```bash
-npx prisma migrate dev
-npx prisma generate
+npm run prisma:migrate
+npm run prisma:generate
 ```
 
 ---
