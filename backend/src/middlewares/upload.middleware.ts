@@ -16,12 +16,16 @@ declare global {
   }
 }
 
-const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SUPABASE_KEY = process.env.SUPABASE_KEY!;
-const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET!;
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
 const isLocal = process.env.NODE_ENV === "local";
+
+const SUPABASE_URL = process.env.SUPABASE_URL || "";
+const SUPABASE_KEY = process.env.SUPABASE_KEY || "";
+const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || "";
+
+// Only create Supabase client if not in local mode
+const supabase = !isLocal && SUPABASE_URL && SUPABASE_KEY 
+  ? createClient(SUPABASE_URL, SUPABASE_KEY)
+  : null;
 
 // ---------- PDF VALIDATION ----------
 const allowedPdfMime = ["application/pdf"];
@@ -68,6 +72,10 @@ async function uploadBufferToSupabase(
   originalname: string,
   mimetype: string
 ): Promise<{ url: string; storageKey: string }> {
+  if (!supabase) {
+    throw new Error("Supabase client not initialized");
+  }
+  
   const storageKey = `articles/${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(originalname)}`;
   const { data, error } = await supabase.storage
     .from(SUPABASE_BUCKET)
