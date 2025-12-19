@@ -102,3 +102,4 @@ model RefreshToken {
 
   user User @relation(fields: [userId], references: [id])
 }
+
