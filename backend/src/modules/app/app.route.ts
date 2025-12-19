@@ -9,7 +9,7 @@ import RbacRouter from "@/modules/rbac/rbac.route.js";
 // wrapped in /api in app.ts
 export const AppRouter: Router = Router();
 
-AppRouter.use("/auth", requireAuth, AuthRouter);
+AppRouter.use("/auth",  AuthRouter);
 AppRouter.use("/users", requireAuth, UserRouter);
 AppRouter.use("/rbac", requireAuth, RbacRouter);
 
