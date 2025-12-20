@@ -1,34 +1,48 @@
 "use client"
+import React, { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { useState, useEffect } from "react"
+import { usePathname, useRouter } from "next/navigation"
 import { toast } from 'react-toastify' 
+
+// ✅ Redux Toolkit Imports
+import { useSelector, useDispatch } from "react-redux"
+import { RootState } from "../lib/store/store"
+import { setAuth, logout as logoutAction } from "../lib/store/authSlice"
 
 export default function Navbar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const dispatch = useDispatch()
+  
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   
-  // ✅ FIX: Initial state ko 'null' ki jagah empty object rakha
-  // Isse VS Code ko pata chalega ki isme 'name' aane wala hai
-  const [user, setUser] = useState({ name: "" })
+  // ✅ Redux Store se user nikal rahe hain (Ab 'user.name' yahan se aayega)
+  const user = useSelector((state: RootState) => state.auth.user)
 
+  // ✅ Refresh Fix: Agar refresh pe Redux khali ho jaye to localstorage se bhar lo
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem("authToken");
       const userName = localStorage.getItem("userName");
-      if (token && userName) {
-        setUser({ name: userName });
+      if (token && userName && !user) {
+        dispatch(setAuth({ 
+          user: { name: userName, email: "" }, 
+          token: token 
+        }));
       }
     }
-  }, []);
+  }, [dispatch, user]);
 
   const handleLogout = () => {
+    // 1. Redux Clear
+    dispatch(logoutAction());
+    // 2. Storage Clear
     localStorage.removeItem("authToken");
     localStorage.removeItem("userName");
-    // ✅ FIX: Logout par wapas empty string set kiya (null nahi)
-    setUser({ name: "" });
+    
     toast.info("Logged out successfully");
     setIsMobileMenuOpen(false); 
+    router.push("/login");
   }
 
   const navItems = [
@@ -68,8 +82,8 @@ export default function Navbar() {
             </div>
 
             <div className="hidden lg:flex lg:items-center lg:space-x-4">
-              {/* ✅ FIX: Yahan check kar rahe hain ki name exist karta hai ya nahi */}
-              {user.name ? (
+              {/* ✅ Redux 'user.name' check */}
+              {user && user.name ? (
                 <div className="flex items-center gap-3">
                     <span className="text-gray-700 font-medium">Hello, {user.name}</span>
                     
@@ -115,7 +129,6 @@ export default function Navbar() {
               <button
                 onClick={toggleMobileMenu}
                 className="p-2 text-gray-700 hover:text-red-600 transition-colors duration-200"
-                aria-label="Toggle menu"
               >
                 {isMobileMenuOpen ? (
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -132,6 +145,7 @@ export default function Navbar() {
         </div>
       </nav>
 
+      {/* Mobile Menu (Design intact) */}
       <div
         className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out lg:hidden ${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
@@ -139,11 +153,8 @@ export default function Navbar() {
       >
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <img src="/img/logo.jpg" alt="Law Nation Prime Times Journal" className="h-10 w-auto" />
-            <button
-              onClick={toggleMobileMenu}
-              className="p-2 text-gray-700 hover:text-red-600 transition-colors duration-200"
-            >
+            <img src="/img/logo.jpg" alt="Logo" className="h-10 w-auto" />
+            <button onClick={toggleMobileMenu} className="p-2 text-gray-700 hover:text-red-600">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -167,8 +178,7 @@ export default function Navbar() {
           </div>
 
           <div className="border-t border-gray-200 p-4 space-y-3">
-            {/* ✅ FIX: Yahan bhi check change kiya */}
-            {user.name ? (
+            {user && user.name ? (
                <div className="space-y-3">
                    <div className="flex items-center gap-3 px-2 mb-2">
                        <div className="h-8 w-8 rounded-full bg-red-600 text-white flex items-center justify-center font-bold uppercase text-sm">
