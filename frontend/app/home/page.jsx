@@ -2,6 +2,8 @@
 
 import { useRef, useState } from "react"
 import Link from "next/link"
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function HomePage() {
   const [query, setQuery] = useState("")
@@ -125,9 +127,11 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
+      {/* ✅ Popup Container for Top-Right side */}
+      {/* <ToastContainer position="top-right" autoClose={2000} theme="colored" /> */}
+
       {/* Hero */}
       <section className="relative overflow-hidden">
-        {/* Background image with soft overlay */}
         <div
           className="absolute inset-0"
           style={{
@@ -214,60 +218,6 @@ export default function HomePage() {
                       />
                     </div>
                   </div>
-
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-semibold text-gray-700">Year (from)</label>
-                      <input
-                        type="number"
-                        value={filters.yearFrom}
-                        onChange={(e) => updateFilter("yearFrom", e.target.value)}
-                        placeholder="2015"
-                        className="w-full bg-white border border-neutral-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-red-100 focus:border-red-300 outline-none text-sm"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-semibold text-gray-700">Year (to)</label>
-                      <input
-                        type="number"
-                        value={filters.yearTo}
-                        onChange={(e) => updateFilter("yearTo", e.target.value)}
-                        placeholder="2025"
-                        className="w-full bg-white border border-neutral-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-red-100 focus:border-red-300 outline-none text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-semibold text-gray-700">Category</label>
-                      <select
-                        value={filters.category}
-                        onChange={(e) => updateFilter("category", e.target.value)}
-                        className="w-full bg-white border border-neutral-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-red-100 focus:border-red-300 outline-none text-sm"
-                      >
-                        <option value="all">All disciplines</option>
-                        <option value="constitutional">Constitutional Law</option>
-                        <option value="criminal">Criminal Justice</option>
-                        <option value="corporate">Corporate & Finance</option>
-                        <option value="tech">Technology & Privacy</option>
-                        <option value="international">International Law</option>
-                        <option value="environment">Environmental Law</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-semibold text-gray-700">Sort by</label>
-                      <select
-                        value={filters.sort}
-                        onChange={(e) => updateFilter("sort", e.target.value)}
-                        className="w-full bg-white border border-neutral-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-red-100 focus:border-red-300 outline-none text-sm"
-                      >
-                        <option value="relevance">Relevance</option>
-                        <option value="latest">Latest first</option>
-                        <option value="citations">Most cited</option>
-                      </select>
-                    </div>
-                  </div>
                 </div>
               )}
 
@@ -316,13 +266,6 @@ export default function HomePage() {
                       className="absolute inset-0 h-full w-full object-cover"
                       loading="lazy"
                     />
-                    <button
-                      type="button"
-                      className="absolute top-3 right-3 h-8 w-8 rounded-full bg-white/90 border border-neutral-300 shadow-sm flex items-center justify-center text-neutral-800"
-                      aria-label="Profile"
-                    >
-                      <span className="inline-block h-5 w-5 rounded-full bg-gradient-to-br from-black to-gray-700" />
-                    </button>
                   </div>
 
                   <div className="flex flex-col flex-1 px-4 sm:px-5 pb-6">
@@ -362,7 +305,6 @@ export default function HomePage() {
                   })
                 }
                 className="pointer-events-auto h-10 w-10 rounded-full bg-white/90 border border-neutral-300 shadow-sm flex items-center justify-center text-neutral-800 hover:bg-white transition"
-                aria-label="Previous"
               >
                 ‹
               </button>
@@ -375,7 +317,6 @@ export default function HomePage() {
                   })
                 }
                 className="pointer-events-auto h-10 w-10 rounded-full bg-white/90 border border-neutral-300 shadow-sm flex items-center justify-center text-neutral-800 hover:bg-white transition"
-                aria-label="Next"
               >
                 ›
               </button>
@@ -419,4 +360,3 @@ export default function HomePage() {
     </div>
   )
 }
-
