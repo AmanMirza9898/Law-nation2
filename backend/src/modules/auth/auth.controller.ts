@@ -2,14 +2,39 @@ import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 import { AuthService } from "./auth.service.js";
 import { type AuthRequest } from "@/types/auth-request.js";
+import { sendAuthNotification } from "@/utils/email.utils.js"; // Aapka Red & White mail utility
 import {
   loginSchema,
+  signupSchema,
   refreshSchema,
   logoutSchema,
 } from "./validators/auth.validator.js";
 import { UnauthorizedError } from "@/utils/http-errors.util.js";
 
-// /src/controllers/auth.controller.ts
+// --- SIGNUP HANDLER (Naya Registration) ---
+export async function signupHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const data = signupSchema.parse(req.body);
+    const result = await AuthService.signup(data);
+
+    // ✅ SIRF SIGNUP PAR MAIL JAYEGI
+    // Teesra parameter "signup" hata diya hai
+    sendAuthNotification(data.email, data.name); 
+
+    return res.status(201).json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: z.treeifyError(err) });
+    }
+    next(err);
+  }
+}
+
+// --- LOGIN HANDLER (Signin) ---
 export async function loginHandler(
   req: Request,
   res: Response,
@@ -18,6 +43,10 @@ export async function loginHandler(
   try {
     const data = loginSchema.parse(req.body);
     const result = await AuthService.login(data.email, data.password, res);
+
+    // ❌ LOGIN PAR EMAIL WALI LINE DELETE KAR DI HAI
+    // Ab user login karega toh koi email nahi jayegi.
+
     return res.json(result);
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -27,6 +56,7 @@ export async function loginHandler(
   }
 }
 
+// --- REFRESH HANDLER ---
 export async function refreshHandler(
   req: Request,
   res: Response,
@@ -45,6 +75,7 @@ export async function refreshHandler(
   }
 }
 
+// --- LOGOUT HANDLER ---
 export async function logoutHandler(
   req: Request,
   res: Response,
@@ -63,6 +94,7 @@ export async function logoutHandler(
   }
 }
 
+// --- ME HANDLER (Current User) ---
 export async function meHandler(
   req: AuthRequest,
   res: Response,
