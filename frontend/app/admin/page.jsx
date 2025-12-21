@@ -1,7 +1,10 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { toast } from 'react-toastify';
 
+// Stat Card Component
 const StatCard = ({ title, count }) => (
   <div className="bg-white p-6 rounded-xl border-l-4 border-red-600 shadow-md">
     <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{title}</p>
@@ -10,40 +13,71 @@ const StatCard = ({ title, count }) => (
 );
 
 export default function AdminDashboard() {
-  const [editors] = useState(["Rahul Jha", "Priya Singh", "Karan Roy"]); // Editors abhi static hain (baad me dynamic kar lenge)
+  const router = useRouter();
   
-  // Real articles state
+  // ✅ 1. SECURITY STATES
+  const [currentAdmin, setCurrentAdmin] = useState({ name: "Admin", email: "" });
+  const [isAuthorized, setIsAuthorized] = useState(false); // Default Blocked
+
+  // ✅ 2. ROUTE PROTECTION (Ye sabse important hai)
+  useEffect(() => {
+    // Check karo 'adminToken' hai ya nahi
+    const token = localStorage.getItem("adminToken");
+    const adminData = localStorage.getItem("adminUser");
+
+    if (!token) {
+        // Agar token nahi hai, to turant bhaga do
+        router.push("/admin-login");
+    } else {
+        // Token hai, to Access Granted
+        try {
+            if (adminData) {
+                setCurrentAdmin(JSON.parse(adminData));
+            }
+            setIsAuthorized(true); 
+        } catch (error) {
+            // Agar data corrupt hai to logout karo
+            localStorage.removeItem("adminToken");
+            router.push("/admin-login");
+        }
+    }
+  }, [router]);
+
+  // ✅ 3. ADMIN LOGOUT (Sirf Admin keys delete karega)
+  const handleLogout = () => {
+    localStorage.removeItem("adminToken");
+    localStorage.removeItem("adminUser");
+    toast.info("Admin Logged Out");
+    router.push('/admin-login');
+  };
+
+  // --- DASHBOARD DATA & LOGIC ---
+  const [editors] = useState(["Rahul Jha", "Priya Singh", "Karan Roy"]);
   const [articles, setArticles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const API_BASE_URL = "http://localhost:4000"; 
 
-  // API Config
-  const API_BASE_URL = "http://localhost:4000"; // Backend URL
-
-  // --- FETCH DATA FROM BACKEND ---
+  // Articles Fetch karna
   useEffect(() => {
+    if (!isAuthorized) return; // Jab tak access confirm na ho, fetch mat karo
+
     const fetchArticles = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/api/articles`);
         if (!response.ok) throw new Error("Failed to fetch");
-        
         const data = await response.json();
-        
-        // Backend data ko Frontend format me map karna
-        // Assuming backend returns an array or { articles: [...] }
-        // Adjust logic based on your exact list controller response
         const articleList = Array.isArray(data) ? data : (data.articles || []);
 
         const formattedArticles = articleList.map(item => ({
             id: item.id,
             title: item.title,
             author: item.authorName,
-            status: mapBackendStatus(item.status), // Helper function below
-            assignedTo: "", // Abhi backend se assignedEditor nahi aa raha hai shayad
-            date: new Date(item.createdAt).toLocaleDateString('en-GB'), // DD/MM/YYYY
+            status: mapBackendStatus(item.status),
+            assignedTo: "", 
+            date: new Date(item.createdAt).toLocaleDateString('en-GB'),
             abstract: item.abstract,
-            pdfUrl: item.currentPdfUrl // Ye /uploads/pdfs/... hoga
+            pdfUrl: item.currentPdfUrl 
         }));
-
         setArticles(formattedArticles);
       } catch (error) {
         console.error("Error fetching articles:", error);
@@ -51,13 +85,10 @@ export default function AdminDashboard() {
         setIsLoading(false);
       }
     };
-
     fetchArticles();
-  }, []);
+  }, [isAuthorized]);
 
-  // Helper to make status look nice
   const mapBackendStatus = (status) => {
-      // Backend enum: PENDING_ADMIN_REVIEW, ASSIGNED_TO_EDITOR, etc.
       if (status === 'PENDING_ADMIN_REVIEW') return 'Pending';
       if (status === 'APPROVED') return 'Published';
       if (status === 'ASSIGNED_TO_EDITOR') return 'In Review';
@@ -65,40 +96,45 @@ export default function AdminDashboard() {
   };
 
   const handlePdfClick = (relativeUrl) => {
-    if (!relativeUrl) {
-        alert("PDF not found");
-        return;
-    }
-    // Backend URL + Relative Path (e.g. http://localhost:4000/uploads/pdfs/xyz.pdf)
+    if (!relativeUrl) { alert("PDF not found"); return; }
     const fullUrl = `${API_BASE_URL}${relativeUrl}`;
     window.open(fullUrl, '_blank');
   };
 
-  // States for Features
+  // Search & Filter
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [showAbstract, setShowAbstract] = useState(null);
 
   const assignArticle = (id, editor) => {
-    // Yahan baad me API call lagegi to assign editor
     setArticles(articles.map(a => a.id === id ? { ...a, assignedTo: editor, status: "In Review" } : a));
+    toast.success(`Assigned to ${editor}`);
   };
 
   const overrideAndPublish = (id) => {
-    // Yahan API call lagegi to publish
     setArticles(articles.map(a => a.id === id ? { ...a, status: "Published", assignedTo: "Admin Override" } : a));
+    toast.success("Article Published!");
   };
 
-  // Logic for Search and Filter
   const filteredArticles = articles.filter(art => {
     const matchesSearch = art.title.toLowerCase().includes(searchTerm.toLowerCase()) || art.author.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "All" || art.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
+  // 🛑 LOADING SCREEN (Jab tak check ho raha hai)
+  if (!isAuthorized) {
+    return (
+        <div className="flex h-screen items-center justify-center bg-gray-50">
+            <h2 className="text-xl font-bold text-red-700 animate-pulse">Verifying Admin Privileges...</h2>
+        </div>
+    );
+  }
+
+  // ✅ MAIN DASHBOARD UI
   return (
     <div className="flex min-h-screen bg-gray-50 flex-col md:flex-row">
-      {/* SIDEBAR - AS IT IS */}
+      {/* SIDEBAR */}
       <aside className="hidden md:flex w-72 bg-red-700 text-white flex-col h-screen sticky top-0 shadow-2xl">
         <div className="p-8 border-b border-red-800">
           <h1 className="text-2xl font-black italic tracking-tighter">LAW NATION</h1>
@@ -113,19 +149,45 @@ export default function AdminDashboard() {
             </button>
           </Link>
         </nav>
-        <div className="p-4 border-t border-red-800"><button className="w-full p-2 text-sm bg-red-900 rounded font-bold uppercase">Logout</button></div>
+        
+        {/* LOGOUT BUTTON */}
+        <div className="p-4 border-t border-red-800">
+            <button 
+                onClick={handleLogout}
+                className="w-full p-2 text-sm bg-red-900 rounded font-bold uppercase hover:bg-black transition-colors"
+            >
+                Logout
+            </button>
+        </div>
       </aside>
 
+      {/* MAIN CONTENT */}
       <main className="flex-1 overflow-y-auto pb-10">
+        
+        {/* HEADER */}
         <header className="bg-white h-20 border-b flex items-center justify-between px-6 md:px-10 shadow-sm sticky top-0 z-10">
           <h2 className="text-xl font-black text-gray-700 uppercase">Management</h2>
-          <Link href="/admin/add-editor">
-            <button className="bg-red-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-black transition-all text-xs">+ CREATE EDITOR</button>
-          </Link>
+          
+          <div className="flex items-center gap-6">
+            <Link href="/admin/add-editor">
+                <button className="bg-red-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-black transition-all text-xs">+ CREATE EDITOR</button>
+            </Link>
+
+            {/* Admin Profile (LocalStorage wala) */}
+            <div className="flex items-center gap-3 pl-6 border-l border-gray-200">
+               <div className="text-right hidden md:block">
+                 <p className="text-sm font-bold text-gray-800">{currentAdmin.name}</p>
+                 <p className="text-[10px] text-gray-500 font-medium">Administrator</p>
+               </div>
+               <div className="w-10 h-10 rounded-full bg-red-100 border-2 border-red-600 text-red-700 flex items-center justify-center font-black text-lg shadow-sm">
+                 {currentAdmin.name ? currentAdmin.name.charAt(0).toUpperCase() : "A"}
+               </div>
+            </div>
+          </div>
         </header>
 
+        {/* CONTENT */}
         <div className="p-6 md:p-10 space-y-10">
-          {/* STAT CARDS - DYNAMIC */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <StatCard title="Total Submissions" count={articles.length} />
             <StatCard title="Awaiting" count={articles.filter(a => a.status === 'Pending').length} />
@@ -137,7 +199,6 @@ export default function AdminDashboard() {
             <div className="bg-gray-50 p-5 border-b flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="font-black text-gray-700 uppercase tracking-tighter text-lg">Monitor & Assign Articles</div>
               
-              {/* NEW: Search and Filter Bar */}
               <div className="flex gap-2 w-full md:w-auto">
                 <input 
                   type="text" 
@@ -170,13 +231,10 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody className="divide-y">
                   {isLoading ? (
-                      <tr>
-                          <td colSpan="5" className="p-10 text-center font-bold text-gray-500">Loading articles...</td>
-                      </tr>
+                      <tr><td colSpan="5" className="p-10 text-center font-bold text-gray-500">Loading articles...</td></tr>
                   ) : filteredArticles.map(art => (
                     <tr key={art.id} className="hover:bg-red-50/30 transition-all">
                       <td className="p-5">
-                        {/* Title Click opens PDF */}
                         <p 
                             onClick={() => handlePdfClick(art.pdfUrl)}
                             className="font-bold text-gray-800 underline cursor-pointer hover:text-red-600"
@@ -209,10 +267,7 @@ export default function AdminDashboard() {
                         </select>
                       </td>
                       <td className="p-5 text-right flex justify-end gap-2 items-center">
-                        {/* Publish Button */}
                         <button onClick={() => overrideAndPublish(art.id)} className="bg-black text-white px-4 py-2 rounded text-[10px] font-black hover:bg-red-600 uppercase transition-colors">Publish</button>
-                        
-                        {/* Action Dropdown */}
                         <button className="text-gray-400 hover:text-black font-bold p-2 text-lg">⋮</button>
                       </td>
                     </tr>
@@ -227,7 +282,6 @@ export default function AdminDashboard() {
         </div>
       </main>
 
-      {/* Abstract View Modal - AS IT IS */}
       {showAbstract && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white max-w-2xl w-full rounded-2xl p-8 shadow-2xl">

@@ -2,12 +2,12 @@
 import React, { useState, ChangeEvent, FormEvent } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+// ✅ Sirf 'toast' import karna hai, Container aur CSS nahi (wo Layout mein hai)
+import { toast } from 'react-toastify';
 
 // ✅ Redux Integration
 import { useDispatch } from "react-redux";
-import { setAuth } from "../lib/store/authSlice"; 
+import { setCredentials } from "../lib/store/authSlice"; 
 
 export default function Login() {
   const router = useRouter()
@@ -21,11 +21,13 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
+  // ✅ Fix 1: TypeScript Type added for Input Change
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
+  // ✅ Fix 2: TypeScript Type added for Form Submit
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
@@ -44,8 +46,8 @@ export default function Login() {
         const user = data.user || { name: data.name, email: data.email };
 
         if (token) {
-          // ✅ Redux store mein data save kar rahe hain
-          dispatch(setAuth({ user, token }));
+          // ✅ Redux store mein data save
+          dispatch(setCredentials({ user, token }));
 
           // ✅ LocalStorage mein backup
           localStorage.setItem("authToken", token);
@@ -53,9 +55,7 @@ export default function Login() {
         }
         
         toast.success("Login Successful! Welcome back.", {
-          position: "top-right",
-          autoClose: 2000,
-          theme: "colored",
+          toastId: "login-success"
         });
 
         setTimeout(() => {
@@ -63,11 +63,15 @@ export default function Login() {
         }, 1500)
 
       } else {
-        toast.error(data.message || "Invalid credentials", { position: "top-right", theme: "colored" });
+        toast.error(data.message || "Invalid credentials", { 
+            toastId: "login-error"
+        });
       }
     } catch (error) {
-      console.error("Login Error:", error)
-      toast.error("Something went wrong. Please try again.", { position: "top-right", theme: "colored" });
+      console.warn("Login Error:", error)
+      toast.error("Something went wrong. Please try again.", { 
+          toastId: "net-error"
+      });
     } finally {
       setIsLoading(false)
     }
@@ -75,7 +79,8 @@ export default function Login() {
 
   return (
     <div className="h-screen flex overflow-hidden">
-      <ToastContainer />
+      
+      {/* ❌ Yahan se <ToastContainer /> HATA DIYA hai */}
 
       {/* Left Side - Original Gradient Design */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-red-800 relative overflow-hidden">
@@ -116,7 +121,7 @@ export default function Login() {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                   </div>
                   <input type="email" name="email" value={formData.email} onChange={handleInputChange} placeholder="Enter your email" className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600 transition-all text-sm bg-gray-50" required />
                 </div>

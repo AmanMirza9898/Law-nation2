@@ -21,9 +21,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <StoreProvider>
           <Navbar />
-          {children}
+          <main className="min-h-screen">
+            {children}
+          </main>
         </StoreProvider>
-        <ToastContainer position="top-right" autoClose={2000} theme="colored" />
+        
+        {/* ✅ ToastContainer Settings - Exactly wahi jo Adminlogin ke liye chahiye */}
+        <ToastContainer 
+          position="top-center" 
+          autoClose={2000}
+          hideProgressBar={false}
+          newestOnTop={true}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss={false}
+          draggable
+          pauseOnHover={false}
+          theme="light"
+          limit={1} // ✅ Ek se zyada toast ek saath nahi dikhega
+        />
       </body>
     </html>
   );
