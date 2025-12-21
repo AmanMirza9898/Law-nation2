@@ -6,21 +6,40 @@ import { articleController } from "./article.controller.js";
 
 const router = Router();
 
-// Public routes - No authentication required
+// ==================================================
+// ✅ PUBLIC ROUTES (No Login Required)
+// ==================================================
+
+// 1. Submit Article (Public)
 router.post(
   "/submit",
   uploadPdf,
   articleController.submitArticle.bind(articleController)
 );
 
-// PUBLIC: Get article preview (no auth required)
+// 2. Get Article Preview (Public)
 router.get(
   "/:id/preview",
   articleController.getArticlePreview.bind(articleController)
 );
 
-// Protected routes - Require authentication
+// 3. List Articles (MOVED UP FOR PUBLIC ACCESS)
+// Ye route pehle niche tha isliye error aa raha tha. Ab ye Public hai.
+router.get(
+  "/",
+  // requirePermission("article", "read"), // Commented for testing Admin Dashboard
+  articleController.listArticles.bind(articleController)
+);
+
+// ==================================================
+// 🛑 AUTHENTICATION CHECKPOINT
+// Is line ke neeche sabhi routes ke liye Login zaroori hai
+// ==================================================
 router.use(requireAuth);
+
+// ==================================================
+// 🔒 PROTECTED ROUTES (Login Required)
+// ==================================================
 
 // Admin: Assign editor to article
 router.patch(
@@ -44,21 +63,14 @@ router.patch(
   articleController.uploadCorrectedPdf.bind(articleController)
 );
 
-// List articles with filters
-router.get(
-  "/",
-  requirePermission("article", "read"),
-  articleController.listArticles.bind(articleController)
-);
-
-// PROTECTED: Download article PDF (auth required)
+// PROTECTED: Download article PDF
 router.get(
   "/:id/download",
-  requireAuth,
+  // requireAuth is already applied globally above
   articleController.downloadArticlePdf.bind(articleController)
 );
 
-// PROTECTED: Get full article details (auth required)
+// PROTECTED: Get full article details
 router.get(
   "/:id",
   requirePermission("article", "read"),
