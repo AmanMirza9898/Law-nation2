@@ -20,6 +20,7 @@ export async function signupHandler(
   try {
     const data = signupSchema.parse(req.body);
     const result = await AuthService.signup(data);
+    
 
     // ✅ SIRF SIGNUP PAR MAIL JAYEGI
     // Teesra parameter "signup" hata diya hai
@@ -44,6 +45,8 @@ export async function loginHandler(
     const data = loginSchema.parse(req.body);
     const result = await AuthService.login(data.email, data.password, res);
 
+    
+
     // ❌ LOGIN PAR EMAIL WALI LINE DELETE KAR DI HAI
     // Ab user login karega toh koi email nahi jayegi.
 
@@ -52,6 +55,8 @@ export async function loginHandler(
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: z.treeifyError(err) });
     }
+
+    
     next(err);
   }
 }
