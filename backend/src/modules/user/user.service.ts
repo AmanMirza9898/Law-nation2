@@ -13,6 +13,7 @@ export const UserService = {
   listUsers,
   findUserById,
   inviteEditor,
+  listEditors,
 };
 
 export default UserService;
@@ -159,4 +160,28 @@ async function inviteEditor(data: { name: string; email: string }, currentUser?:
     message: `Invitation sent to ${email}. The editor has 48 hours to set up their password.`,
     expiresAt,
   };
+}
+/**
+ * ✅ YE NAYA FUNCTION SABSE NEECHE ADD KARO
+ * List all users who have the 'editor' role
+ */
+async function listEditors() {
+  const editors = await prisma.user.findMany({
+    where: {
+      roles: {
+        some: {
+          role: {
+            name: "editor" // Role name match kar rahe hain
+          }
+        }
+      }
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    }
+  });
+
+  return editors;
 }

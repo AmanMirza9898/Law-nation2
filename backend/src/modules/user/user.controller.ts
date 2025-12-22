@@ -16,7 +16,7 @@ export const UserController = {
   listUsersHandler,
   findUserByIdHandler,
   inviteEditorHandler,
-  // add more handlers as needed
+  listEditorsHandler,
 };
 
 export default UserController;
@@ -95,6 +95,21 @@ async function inviteEditorHandler(
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: z.treeifyError(err) });
     }
+    next(err);
+  }
+}
+
+
+// user.controller.ts ke sabse neeche
+async function listEditorsHandler(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const result = await UserService.listEditors();
+    return res.status(200).json(result);
+  } catch (err) {
     next(err);
   }
 }

@@ -248,7 +248,7 @@ export async function sendEditorInvitationEmail(
   editorName: string,
   token: string
 ) {
-  const setupPasswordUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/setup-password?token=${token}`;
+  const setupPasswordUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/law/setup-password?token=${token}`;
   
   const htmlContent = `
     <div style="font-family: 'Helvetica', Arial, sans-serif; max-width: 600px; margin: auto; border: 2px solid #d32f2f; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
