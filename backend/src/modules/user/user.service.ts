@@ -13,6 +13,7 @@ export const UserService = {
   listUsers,
   findUserById,
   inviteEditor,
+  listEditors,
 };
 
 export default UserService;
@@ -100,6 +101,33 @@ async function findUserById(id: string, currentUser?: AuthUser) {
       roles: user.roles.map((r) => r.role),
     },
   };
+}
+
+/**
+ * List all users who have the 'editor' role
+ */
+async function listEditors() {
+  const editors = await prisma.user.findMany({
+    where: {
+      roles: {
+        some: {
+          role: {
+            name: "editor"
+          }
+        }
+      }
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+    orderBy: {
+      createdAt: "desc"
+    }
+  });
+
+  return editors;
 }
 
 /**
