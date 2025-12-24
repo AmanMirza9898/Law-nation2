@@ -387,57 +387,61 @@ export default function HomePage() {
       </section>
 
      {/* Editors' Picks - Premium Card Style */}
-<section className="bg-gray-50 py-14 sm:py-16 article-font">
-  <div className="max-w-6xl mx-auto px-6 sm:px-10 lg:px-12">
-    <p className="text-sm tracking-wide text-gray-500 mb-10 font-semibold uppercase">
-      Recently Published
-    </p>
+<section className="bg-white py-14 sm:py-16 font-sans">
+  <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-12">
+    {/* Section Title - Black & White */}
+    <div className="mb-12">
+  {/* text-center se headline beech mein aa jayegi, agar left mein chahiye toh text-center hata dena */}
+  <h2 className="text-4xl font-bold text-black leading-tight text-center">
+    Network <span className="text-gray-900">Spotlight</span>
+  </h2>
+</div>
 
     <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
       {isLoading ? (
-        <p className="text-gray-600 col-span-full">Loading articles...</p>
+        <p className="text-black col-span-full text-center font-medium">Loading articles...</p>
       ) : publishedArticles.length > 0 ? (
         publishedArticles.map((item) => (
           <article
             key={item._id || item.id}
-            className="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300 p-6 flex flex-col justify-between h-full"
+            className="bg-white border border-gray-200 rounded-lg p-8 flex flex-col h-full overflow-hidden"
           >
             <div className="space-y-4">
-              <h3 className="text-2xl font-semibold text-gray-900 leading-snug hover:text-red-700 transition-colors break-words">
+              {/* Title - Black, breaks long words, moves to next line */}
+              <h3 className="text-xl font-bold text-black leading-snug break-words overflow-wrap-anywhere">
                 {item.title}
               </h3>
 
-              <p className="text-sm text-gray-500 break-words">
-                <span className="font-medium">{item.authorName || "Anonymous"}</span>
-                <span className="mx-1">| Law Nation |</span>
-                <span>{new Date(item.createdAt).toLocaleDateString("en-GB")}</span>
-              </p>
-
-              <p className="text-gray-700 leading-relaxed italic line-clamp-3 break-words">
-                "{item.abstract}"
+              {/* Abstract - Gray for better readability */}
+              <p className="text-[15px] text-gray-600 leading-relaxed line-clamp-4 break-words">
+                {item.abstract || "Description text goes here. Long words like SSSSSSSSSSSSSSSSSSS will now break automatically."}
               </p>
             </div>
-
-            <button
-              onClick={() => {
-                const path = item.currentPdfUrl.startsWith("/")
-                  ? item.currentPdfUrl
-                  : `/${item.currentPdfUrl}`;
-                window.open(`${API_BASE_URL}${path}`, "_blank");
-              }}
-              className="mt-6 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors py-2 px-4 rounded-lg self-start shadow-md"
-            >
-              Read Full Paper →
-            </button>
+            
+            {/* Bottom Section: Author (Left) and Read More (Right) */}
+            <div className="mt-auto pt-6 flex items-center justify-between border-t border-gray-100 mt-6">
+               <span className="text-sm font-semibold text-black truncate max-w-[140px]">
+                  {item.authorName || "Anonymous"}
+               </span>
+               
+               <button
+                  onClick={() => {
+                    const path = item.currentPdfUrl.startsWith("/") ? item.currentPdfUrl : `/${item.currentPdfUrl}`;
+                    window.open(`${API_BASE_URL}${path}`, "_blank");
+                  }}
+                  className="text-sm font-bold text-red-500 hover:underline flex items-center gap-1 shrink-0"
+               >
+                  Read more <span className="text-lg">→</span>
+               </button>
+            </div>
           </article>
         ))
       ) : (
-        <p className="text-gray-500 col-span-full">No articles published yet.</p>
+        <p className="text-gray-500 col-span-full text-center">No articles published yet.</p>
       )}
     </div>
   </div>
 </section>
-
     </div>
   );
 }
