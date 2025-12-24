@@ -6,6 +6,12 @@ import { articleController } from "./article.controller.js";
 
 const router = Router();
 
+// List articles with filters
+router.get(
+  "/",
+  articleController.listArticles.bind(articleController)
+);
+
 // Public/Optional Auth routes - Works for both guest and logged-in users
 router.post(
   "/submit",
@@ -26,30 +32,8 @@ router.get(
   articleController.getArticlePreview.bind(articleController)
 );
 
-// 3. List Articles (MOVED UP FOR PUBLIC ACCESS)
-// Ye route pehle niche tha isliye error aa raha tha. Ab ye Public hai.
-router.get(
-  "/",
-  // requirePermission("article", "read"), // Commented for testing Admin Dashboard
-  articleController.listArticles.bind(articleController)
-);
-
-// ==================================================
-// 🛑 AUTHENTICATION CHECKPOINT
-// Is line ke neeche sabhi routes ke liye Login zaroori hai
-// ==================================================
+// Protected routes - Require authentication
 router.use(requireAuth);
-
-// ✅ Editor Dashboard ke liye assigned articles fetch karne ka route
-router.get(
-  "/editor/:editorId",
-  requirePermission("article", "read"), // Editor ke paas read permission honi chahiye
-  articleController.listArticlesByEditor.bind(articleController) 
-);
-
-// ==================================================
-// 🔒 PROTECTED ROUTES (Login Required)
-// ==================================================
 
 // Admin: Assign editor to article
 router.patch(
@@ -73,14 +57,16 @@ router.patch(
   articleController.uploadCorrectedPdf.bind(articleController)
 );
 
-// PROTECTED: Download article PDF
+
+
+// PROTECTED: Download article PDF (auth required)
 router.get(
   "/:id/download",
-  // requireAuth is already applied globally above
+  requireAuth,
   articleController.downloadArticlePdf.bind(articleController)
 );
 
-// PROTECTED: Get full article details
+// PROTECTED: Get full article details (auth required)
 router.get(
   "/:id",
   requirePermission("article", "read"),

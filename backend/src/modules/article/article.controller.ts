@@ -108,6 +108,7 @@ export class ArticleController {
 
   // Editor or Admin approves article (Option A)
   async approveArticle(req: AuthRequest, res: Response) {
+    console.log("APPROVE USER 👉", req.user); 
     try {
       const articleId = req.params.id;
       if (!articleId) {
@@ -115,7 +116,10 @@ export class ArticleController {
       }
 
       const userId = req.user!.id;
-      const userRoles = req.user!.roles.map((role: { name: string }) => role.name);
+      const userRoles =
+  req.user?.roles?.map(
+    (r: any) => r.role.name
+  ) || [];
 
       const article = await articleService.approveArticle(articleId, userId, userRoles);
 

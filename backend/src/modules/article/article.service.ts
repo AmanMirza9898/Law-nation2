@@ -240,7 +240,7 @@ export class ArticleService {
     const updatedArticle = await prisma.article.update({
       where: { id: articleId },
       data: {
-        status: "APPROVED",
+        status: "PUBLISHED",
         approvedAt: new Date(),
         reviewedAt: new Date(),
       },
@@ -350,64 +350,52 @@ export class ArticleService {
   }
 
   // Get single article details (full access - for logged-in users)
-  async getArticleById(articleId: string) {
-    const article = await prisma.article.findUnique({
-      where: { 
-        id: articleId,
-        status: "APPROVED"  // Only show approved articles
-      },
-      include: {
-        assignedEditor: {
-          select: { id: true, name: true, email: true },
-        },
-        revisions: {
-          orderBy: { createdAt: "desc" },
-        },
-      },
-    });
+ async getArticleById(articleId: string) {
+  const article = await prisma.article.findUnique({
+    where: { id: articleId }, // ✅ Ab Editor ko pending articles bhi dikhenge
+    include: {
+      assignedEditor: { select: { id: true, name: true, email: true } },
+      revisions: { orderBy: { createdAt: "desc" } },
+    },
+  });
 
-    if (!article) {
-      throw new NotFoundError("Article not found or not published");
-    }
-
-    return article;
-  }
+  if (!article) throw new NotFoundError("Article not found");
+  return article;
+}
 
   // Get article preview (limited access - for non-logged-in users)
-  async getArticlePreview(articleId: string) {
-    const article = await prisma.article.findUnique({
-      where: { 
-        id: articleId, 
-        status: "APPROVED" // Only show approved articles
-      },
-      select: {
-        id: true,
-        title: true,
-        category: true,
-        abstract: true,
-        authorName: true,
-        authorOrganization: true,
-        keywords: true,
-        submittedAt: true,
-        // NO PDF URLs - this is the key difference
-        // NO revisions
-        // NO assigned editor
-      },
-    });
+  // Get article preview (limited access - for non-logged-in users)
+  async getArticlePreview(articleId: string) {
+    const article = await prisma.article.findUnique({
+      where: { 
+        id: articleId, 
+        status: "PUBLISHED" 
+      }, 
+      select: {
+        id: true,
+        title: true,
+        category: true,
+        abstract: true,
+        authorName: true,
+        authorOrganization: true,
+        keywords: true,
+        submittedAt: true,
+      },
+    });
 
-    if (!article) {
-      throw new NotFoundError("Article not found or not published");
-    }
+    if (!article) {
+      throw new NotFoundError("Article not found or not published");
+    }
 
-    return article;
-  }
+    return article;
+  }
 
   // Get PDF URL for download (for logged-in users)
   async getArticlePdfUrl(articleId: string) {
     const article = await prisma.article.findUnique({
       where: { 
         id: articleId, 
-        status: "APPROVED" 
+        status: "PUBLISHED" 
       },
       select: { 
         currentPdfUrl: true,

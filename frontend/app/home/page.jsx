@@ -30,7 +30,7 @@ export default function HomePage() {
     const fetchArticles = async () => {
       try {
         // Backend se sirf wahi articles mangao jo APPROVED hain
-        const res = await fetch(`${API_BASE_URL}/api/articles?status=APPROVED`);
+        const res = await fetch(`${API_BASE_URL}/api/articles?status=PUBLISHED`);
         const data = await res.json();
 
         // Data extract karein (array check ke saath)
@@ -386,55 +386,58 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Editors' picks style list */}
-      <section className="bg-white py-14 sm:py-16 article-font">
-        <div className="max-w-6xl mx-auto px-6 sm:px-10 lg:px-12">
-          <p className="text-sm tracking-wide text-neutral-700 mb-8 font-semibold uppercase">
-            Recently Published
-          </p>
-          <div className="grid gap-x-12 gap-y-10 md:grid-cols-2 lg:grid-cols-3">
-            {isLoading ? (
-              <p>Loading articles...</p>
-            ) : publishedArticles.length > 0 ? (
-              publishedArticles.map((item) => (
-                <article
-                  key={item._id}
-                  className="space-y-2 border-b border-gray-100 pb-4"
-                >
-                  <h3 className="text-2xl font-semibold text-neutral-900 leading-tight">
-                    {item.title}
-                  </h3>
-                  <p className="text-[15px] text-neutral-800">
-                    <span className="font-semibold">
-                      {item.authorName || "Anonymous"}
-                    </span>
-                    <span className="text-neutral-600"> | Law Nation | </span>
-                    <span className="text-neutral-700">
-                      {new Date(item.createdAt).toLocaleDateString("en-GB")}
-                    </span>
-                  </p>
-                  <p className="text-[15px] text-neutral-700 leading-relaxed line-clamp-3 italic">
-                    "{item.abstract}"
-                  </p>
-                  <button
-                    onClick={() => {
-                      const path = item.currentPdfUrl.startsWith("/")
-                        ? item.currentPdfUrl
-                        : `/${item.currentPdfUrl}`;
-                      window.open(`${API_BASE_URL}${path}`, "_blank");
-                    }}
-                    className="text-[14px] font-semibold text-red-700 hover:text-red-800"
-                  >
-                    Read Full Paper →
-                  </button>
-                </article>
-              ))
-            ) : (
-              <p className="text-gray-500">No articles published yet.</p>
-            )}
-          </div>
-        </div>
-      </section>
+     {/* Editors' Picks - Premium Card Style */}
+<section className="bg-gray-50 py-14 sm:py-16 article-font">
+  <div className="max-w-6xl mx-auto px-6 sm:px-10 lg:px-12">
+    <p className="text-sm tracking-wide text-gray-500 mb-10 font-semibold uppercase">
+      Recently Published
+    </p>
+
+    <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+      {isLoading ? (
+        <p className="text-gray-600 col-span-full">Loading articles...</p>
+      ) : publishedArticles.length > 0 ? (
+        publishedArticles.map((item) => (
+          <article
+            key={item._id || item.id}
+            className="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300 p-6 flex flex-col justify-between h-full"
+          >
+            <div className="space-y-4">
+              <h3 className="text-2xl font-semibold text-gray-900 leading-snug hover:text-red-700 transition-colors break-words">
+                {item.title}
+              </h3>
+
+              <p className="text-sm text-gray-500 break-words">
+                <span className="font-medium">{item.authorName || "Anonymous"}</span>
+                <span className="mx-1">| Law Nation |</span>
+                <span>{new Date(item.createdAt).toLocaleDateString("en-GB")}</span>
+              </p>
+
+              <p className="text-gray-700 leading-relaxed italic line-clamp-3 break-words">
+                "{item.abstract}"
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                const path = item.currentPdfUrl.startsWith("/")
+                  ? item.currentPdfUrl
+                  : `/${item.currentPdfUrl}`;
+                window.open(`${API_BASE_URL}${path}`, "_blank");
+              }}
+              className="mt-6 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors py-2 px-4 rounded-lg self-start shadow-md"
+            >
+              Read Full Paper →
+            </button>
+          </article>
+        ))
+      ) : (
+        <p className="text-gray-500 col-span-full">No articles published yet.</p>
+      )}
+    </div>
+  </div>
+</section>
+
     </div>
   );
 }

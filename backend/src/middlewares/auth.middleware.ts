@@ -52,11 +52,11 @@ export async function requireAuth(
     }
   }
 
-  // Attach to request
-  req.user = {
-    id: user.id,
-    roleIds: user.roles.map((r) => r.roleId),
-  };
+ req.user = {
+  id: user.id,
+  roles: user.roles,   // 👈 FULL ROLE OBJECT
+};
+
 
   req.permissions = permissionSet;
 
