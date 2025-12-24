@@ -18,10 +18,8 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(morgan("dev"));
 
-// --- STATIC FILES LOGIC START ---
-// process.cwd() project ke root (LAW-NATION) folder ka path dega
+// Serve static files from uploads folder
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
-// --- STATIC FILES LOGIC END ---
 
 // API routes mount point
 app.use("/api", AppRouter);

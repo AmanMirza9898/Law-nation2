@@ -200,48 +200,62 @@ export class ArticleService {
     return updatedArticle;
   }
 
-  // Step 3 - Option A: Editor approves directly
-  // backend/src/modules/article/article.service.ts
+  // Step 3 - Option A: Editor or Admin approves directly
+  async approveArticle(articleId: string, userId: string, userRoles: string[]) {
+    const article = await prisma.article.findUnique({
+      where: { id: articleId },
+    });
 
-async approveArticle(articleId: string, editorId: string, isAdmin: boolean = false) {
-  const article = await prisma.article.findUnique({
-    where: { id: articleId },
-  });
+    if (!article) {
+      throw new NotFoundError("Article not found");
+    }
 
-  if (!article) {
-    throw new NotFoundError("Article not found");
+    // Check if user has permission to approve
+    const isAdmin = userRoles.includes("admin");
+    const isAssignedEditor = article.assignedEditorId === userId;
+
+    if (!isAdmin && !isAssignedEditor) {
+      throw new ForbiddenError("You do not have permission to approve this article");
+    }
+
+    // Admin can approve from any status, Editor only from specific statuses
+    if (!isAdmin) {
+      if (
+        article.status !== "ASSIGNED_TO_EDITOR" &&
+        article.status !== "PENDING_APPROVAL"
+      ) {
+        throw new BadRequestError("Article cannot be approved in current status");
+      }
+    } else {
+      // Admin can approve from PENDING_ADMIN_REVIEW, ASSIGNED_TO_EDITOR, or PENDING_APPROVAL
+      if (
+        article.status !== "PENDING_ADMIN_REVIEW" &&
+        article.status !== "ASSIGNED_TO_EDITOR" &&
+        article.status !== "PENDING_APPROVAL"
+      ) {
+        throw new BadRequestError("Article cannot be approved in current status");
+      }
+    }
+
+    const updatedArticle = await prisma.article.update({
+      where: { id: articleId },
+      data: {
+        status: "APPROVED",
+        approvedAt: new Date(),
+        reviewedAt: new Date(),
+      },
+    });
+
+    // Send approval email
+    sendArticleApprovalNotification(
+      article.authorEmail,
+      article.authorName,
+      article.title,
+      article.id
+    );
+
+    return updatedArticle;
   }
-
-  // ✅ LOGIC UPDATE: Agar admin hai toh assignedEditorId ki zaroorat nahi
-  if (!isAdmin && article.assignedEditorId !== editorId) {
-    throw new ForbiddenError("You are not assigned to this article");
-  }
-
-  // ✅ Admin ko kisi bhi status se approve karne ki permission dein
-  const validStatuses = ["ASSIGNED_TO_EDITOR", "PENDING_APPROVAL", "PENDING_ADMIN_REVIEW"];
-  if (!validStatuses.includes(article.status)) {
-    throw new BadRequestError("Article cannot be approved in current status");
-  }
-
-  const updatedArticle = await prisma.article.update({
-    where: { id: articleId },
-    data: {
-      status: "APPROVED",
-      approvedAt: new Date(),
-      reviewedAt: new Date(),
-    },
-  });
-
-  // Approval notification email bhejiye
-  sendArticleApprovalNotification(
-    article.authorEmail,
-    article.authorName,
-    article.title,
-    article.id
-  );
-
-  return updatedArticle;
-}
 
   // Step 3 - Editor uploads corrected PDF
   async uploadCorrectedPdf(

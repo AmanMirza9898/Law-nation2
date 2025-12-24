@@ -57,14 +57,13 @@ export class ArticleController {
   }
 
   // Verify email and create article (public endpoint)
- // ✅ ISSE REPLACE KAREIN (ArticleController.ts mein)
-async verifyArticleSubmission(req: AuthRequest, res: Response) {
-  try {
-    const { token } = req.params;
+  async verifyArticleSubmission(req: AuthRequest, res: Response) {
+    try {
+      const { token } = req.params;
 
-    if (!token) {
-      throw new BadRequestError("Verification token is required");
-    }
+      if (!token) {
+        throw new BadRequestError("Verification token is required");
+      }
 
       // Verify token and create article in database
       await articleService.confirmArticleSubmission(token);
@@ -107,33 +106,27 @@ async verifyArticleSubmission(req: AuthRequest, res: Response) {
     }
   }
 
-  // Editor approves article (Option A)
- // backend/src/modules/article/article.controller.ts
+  // Editor or Admin approves article (Option A)
+  async approveArticle(req: AuthRequest, res: Response) {
+    try {
+      const articleId = req.params.id;
+      if (!articleId) {
+        throw new BadRequestError("Article ID is required");
+      }
 
-async approveArticle(req: AuthRequest, res: Response) {
-  try {
-    const articleId = req.params.id;
-    if (!articleId) {
-      throw new BadRequestError("Article ID is required");
+      const userId = req.user!.id;
+      const userRoles = req.user!.roles.map((role: { name: string }) => role.name);
+
+      const article = await articleService.approveArticle(articleId, userId, userRoles);
+
+      res.json({
+        message: "Article approved successfully",
+        article,
+      });
+    } catch (error) {
+      throw error;
     }
-
-    const editorId = req.user!.id;
-
-    // 1. Check karein ki user Admin hai ya nahi
-    const isAdmin = req.user?.role === "ADMIN";
-
-    // 2. 🛑 FIX: Teesri value (isAdmin) yahan pass karein
-    // Taaki service layer ko pata chale ki bypass karna hai ya nahi
-    const article = await articleService.approveArticle(articleId, editorId, isAdmin);
-
-    res.json({
-      message: "Article approved successfully",
-      article,
-    });
-  } catch (error) {
-    throw error;
   }
-}
 
   // Editor uploads corrected PDF (Option C - Step 1)
   async uploadCorrectedPdf(req: AuthRequest, res: Response) {
@@ -198,27 +191,6 @@ async approveArticle(req: AuthRequest, res: Response) {
       throw error;
     }
   }
-
-  // ✅ Is function ko ArticleController class ke andar add karo
-async listArticlesByEditor(req: AuthRequest, res: Response) {
-  try {
-    const { editorId } = req.params;
-
-    if (!editorId) {
-      throw new BadRequestError("Editor ID is required");
-    }
-
-    // Aapke service layer ka use karte hue data fetch karein
-    // Hum filters mein assignedEditorId bhej rahe hain
-    const result = await articleService.listArticles({ 
-      assignedEditorId: editorId 
-    } as any);
-
-    res.json(result);
-  } catch (error) {
-    throw error; // Global error handler ise handle kar lega
-  }
-}
 
   // Get full article details (protected - auth required)
   async getArticleById(req: AuthRequest, res: Response) {
