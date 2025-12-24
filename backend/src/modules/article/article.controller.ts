@@ -57,28 +57,33 @@ export class ArticleController {
   }
 
   // Verify email and create article (public endpoint)
-  async verifyArticleSubmission(req: AuthRequest, res: Response) {
-    try {
-      const { token } = req.params;
+ // ✅ ISSE REPLACE KAREIN (ArticleController.ts mein)
+async verifyArticleSubmission(req: AuthRequest, res: Response) {
+  try {
+    const { token } = req.params;
 
-      if (!token) {
-        throw new BadRequestError("Verification token is required");
-      }
-
-      const article = await articleService.confirmArticleSubmission(token);
-
-      res.status(200).json({
-        message: "Email verified! Your article has been submitted successfully.",
-        article: {
-          id: article.id,
-          title: article.title,
-          status: article.status,
-        },
-      });
-    } catch (error) {
-      throw error;
+    if (!token) {
+      throw new BadRequestError("Verification token is required");
     }
+
+    // Token verify karke article DB mein create ho jayega
+    await articleService.confirmArticleSubmission(token);
+
+    // Frontend ka home URL (Next.js ka path)
+    // Agar production mein hai to environment variable use karein
+    const frontendHomeUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+
+    // ✅ Ab user JSON nahi dekhega, seedha home page par redirect ho jayega
+    return res.redirect(`${frontendHomeUrl}/law/home?verified=true`);
+
+  } catch (error) {
+    console.error("Verification Error:", error);
+    const frontendHomeUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    
+    // Error hone par bhi home par bhejein message ke sath
+    return res.redirect(`${frontendHomeUrl}/law/home?error=verification-failed`);
   }
+}
 
   // Admin assigns editor
   async assignEditor(req: AuthRequest, res: Response) {

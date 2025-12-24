@@ -1,5 +1,5 @@
 "use client"
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 // 1. Toastify imports
 import { ToastContainer, toast } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
@@ -26,6 +26,22 @@ export default function SubmitPaperPage() {
 
   const [formData, setFormData] = useState(initialFormState)
   const [keywordInput, setKeywordInput] = useState("")
+
+  // --- LOGIN CHECK & AUTOFILL ---
+  useEffect(() => {
+    const token = localStorage.getItem("authToken");
+    const storedUser = localStorage.getItem("user");
+    if (token && storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        setFormData(prev => ({
+          ...prev,
+          fullName: userData.name || "",
+          email: userData.email || ""
+        }));
+      } catch (e) { console.error(e); }
+    }
+  }, [])
 
   const steps = [
     { number: 1, title: "Author Details" },
@@ -65,21 +81,16 @@ export default function SubmitPaperPage() {
     }
   }
 
-  // --- FIXED FUNCTION IS HERE ---
   const handleNext = () => {
-    // Step 1 Check
     if (currentStep === 1) {
       if(!formData.fullName || !formData.email || !formData.phone) {
-         // Replaced alert with toast
-         toast.error("Please fill in all author details.")
-         return;
+          toast.error("Please fill in all author details.")
+          return;
       }
     }
     
-    // Step 2 Check
     if (currentStep === 2) {
       if(!formData.articleTitle || !formData.detailedDescription) {
-        // Replaced alert with toast
         toast.error("Please fill in article details.")
         return;
       }
@@ -89,7 +100,6 @@ export default function SubmitPaperPage() {
       setCurrentStep(currentStep + 1)
     }
   }
-  // -----------------------------
 
   const handlePrevious = () => {
     if (currentStep > 1) {
@@ -100,9 +110,7 @@ export default function SubmitPaperPage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    // Final validation
     if (!formData.file || !formData.contentFormat) {
-      // Replaced alert with toast
       toast.error("Please select a content format and upload a PDF file.")
       return
     }
@@ -121,12 +129,18 @@ export default function SubmitPaperPage() {
       data.append("keywords", formData.keywords.join(", ")) 
       data.append("pdf", formData.file) 
 
+      // --- YE CHANGE HAI BAS ---
+      const token = localStorage.getItem("authToken"); 
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/articles"
       
       const response = await fetch(`${API_URL}/submit`, {
         method: "POST",
+        headers: {
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
         body: data,
       })
+      // ------------------------
 
       const result = await response.json()
 
@@ -134,19 +148,19 @@ export default function SubmitPaperPage() {
         throw new Error(result.message || "Submission failed")
       }
 
-      setStatus({ type: "success", message: "Article submitted successfully!" })
-      
-      // Replaced success alert with toast
-      toast.success("Article submitted successfully!")
-      
-      setFormData(initialFormState)
-      setCurrentStep(1)
-      if(fileInputRef.current) fileInputRef.current.value = ""
+      // Agar result me requiresVerification hai to Guest wala message, warna success
+      if (result.requiresVerification) {
+        toast.info("Verification code sent to your email.")
+      } else {
+        toast.success("Article submitted successfully!")
+        setFormData(initialFormState)
+        setCurrentStep(1)
+        if(fileInputRef.current) fileInputRef.current.value = ""
+      }
 
     } catch (error) {
       console.error("Error:", error)
       setStatus({ type: "error", message: error.message || "Something went wrong." })
-      // Replaced error alert with toast
       toast.error(error.message || "Something went wrong.")
     } finally {
       setIsLoading(false)
@@ -155,7 +169,6 @@ export default function SubmitPaperPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-4 sm:py-6 lg:py-8">
-      {/* 2. Add ToastContainer here */}
       <ToastContainer position="top-center" autoClose={4000} />
 
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">

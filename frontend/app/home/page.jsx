@@ -1,11 +1,32 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useRef, useState , useEffect} from "react"
 import Link from "next/link"
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 export default function HomePage() {
+
+  useEffect(() => {
+    // 1. URL se query parameters nikalne ke liye
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // 2. Agar URL mein ?verified=true hai
+    if (urlParams.get('verified') === 'true') {
+      toast.success("Email Verified! Your article is now in review.");
+      
+      // 3. URL ko saaf karne ke liye taaki refresh par bar-bar toast na aaye
+      // Isse browser address bar se "?verified=true" hat jayega
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // 4. Agar verification fail hui ho (?error=...)
+    if (urlParams.get('error') === 'verification-failed') {
+      toast.error("Verification failed or link expired.");
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
   const [query, setQuery] = useState("")
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [filters, setFilters] = useState({
