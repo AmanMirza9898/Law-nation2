@@ -429,85 +429,81 @@ export class ArticleService {
   }
 
   // Search articles using PostgreSQL Full-Text Search
-  async searchArticles(
-    searchQuery: string,
-    filters: {
-      category?: string;
-      page?: number;
-      limit?: number;
-    }
-  ) {
-    const page = filters.page || 1;
-    const limit = filters.limit || 20;
-    const skip = (page - 1) * limit;
-
-    // Build category filter
-    const categoryFilter = filters.category
-      ? Prisma.sql`AND category = ${filters.category}`
-      : Prisma.empty;
-
-    // PostgreSQL Full-Text Search query with relevance ranking
-    const searchResults = await prisma.$queryRaw<any[]>`
-      SELECT 
-        id, 
-        title, 
-        abstract, 
-        category, 
-        keywords, 
-        "authorName", 
-        "authorOrganization", 
-        "submittedAt",
-        "approvedAt",
-        ts_rank(
-          to_tsvector('english', 
-            coalesce(title, '') || ' ' || 
-            coalesce(abstract, '') || ' ' || 
-            coalesce(array_to_string(keywords, ' '), '') || ' ' ||
-            coalesce(category, '')
-          ),
-          plainto_tsquery('english', ${searchQuery})
-        ) as relevance
-      FROM "Article"
-      WHERE status = 'APPROVED'
-        AND to_tsvector('english', 
-          coalesce(title, '') || ' ' || 
-          coalesce(abstract, '') || ' ' || 
-          coalesce(array_to_string(keywords, ' '), '') || ' ' ||
-          coalesce(category, '')
-        ) @@ plainto_tsquery('english', ${searchQuery})
-        ${categoryFilter}
-      ORDER BY relevance DESC, "approvedAt" DESC
-      LIMIT ${limit}
-      OFFSET ${skip}
-    `;
-
-    // Get total count for pagination
-    const countResult = await prisma.$queryRaw<{ total: bigint }[]>`
-      SELECT COUNT(*) as total
-      FROM "Article"
-      WHERE status = 'APPROVED'
-        AND to_tsvector('english', 
-          coalesce(title, '') || ' ' || 
-          coalesce(abstract, '') || ' ' || 
-          coalesce(array_to_string(keywords, ' '), '') || ' ' ||
-          coalesce(category, '')
-        ) @@ plainto_tsquery('english', ${searchQuery})
-        ${categoryFilter}
-    `;
-
-    const total = Number(countResult[0]?.total || 0);
-
-    return {
-      results: searchResults,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-      query: searchQuery,
-    };
+ // Search articles using PostgreSQL Full-Text Search
+// Search articles using PostgreSQL Full-Text Search
+// ArticleService.ts mein is function ko replace karein
+async searchArticles(
+  searchQuery: string,
+  filters: {
+    category?: string;
+    page?: number;
+    limit?: number;
   }
+) {
+  const page = filters.page || 1;
+  const limit = filters.limit || 20;
+  const skip = (page - 1) * limit;
+
+  // Category filter setup
+  const categoryFilter = filters.category && filters.category !== 'all'
+    ? Prisma.sql`AND category = ${filters.category}`
+    : Prisma.empty;
+
+  /**
+   * FIX: array_to_string ko coalesce ke andar rakha gaya hai.
+   * Agar keywords null honge toh Postgres error (42883) nahi dega.
+   */
+  // ArticleService.ts mein replace karein
+// ArticleService.ts mein searchArticles function ke andar replace karein
+const searchResults = await prisma.$queryRaw<any[]>`
+  SELECT 
+    id, title, abstract, category, "authorName", "currentPdfUrl", "submittedAt",
+    ts_rank(
+      to_tsvector('english', 
+        coalesce(title, '') || ' ' || 
+        coalesce(abstract, '') || ' ' || 
+        -- FIX: keywords ko string mein cast karke space se join kiya gaya hai
+        coalesce(array_to_string(keywords::text[], ' '), '')
+      ),
+      websearch_to_tsquery('english', ${searchQuery})
+    ) as relevance
+  FROM "Article"
+  WHERE status = 'PUBLISHED'
+    AND to_tsvector('english', 
+      coalesce(title, '') || ' ' || 
+      coalesce(abstract, '') || ' ' || 
+      coalesce(array_to_string(keywords::text[], ' '), '')
+    ) @@ websearch_to_tsquery('english', ${searchQuery})
+    ${categoryFilter}
+  ORDER BY relevance DESC
+  LIMIT ${limit}
+  OFFSET ${skip}
+`;
+
+const countResult = await prisma.$queryRaw<any[]>`
+  SELECT COUNT(*)::int as total FROM "Article"
+  WHERE status = 'PUBLISHED'
+    AND to_tsvector('english', 
+      coalesce(title, '') || ' ' || 
+      coalesce(abstract, '') || ' ' ||
+      coalesce(array_to_string(keywords::text[], ' '), '')
+    ) @@ websearch_to_tsquery('english', ${searchQuery})
+    ${categoryFilter}
+`;
+
+  const total = countResult[0]?.total || 0;
+
+  return {
+    results: searchResults,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+    query: searchQuery,
+  };
+}
 }
 
 export const articleService = new ArticleService();

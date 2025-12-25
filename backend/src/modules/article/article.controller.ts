@@ -248,9 +248,11 @@ export class ArticleController {
   // Search articles (public endpoint)
   async searchArticles(req: AuthRequest, res: Response) {
     try {
-      const { q, category, page, limit } = req.query;
+      const { query, category, page, limit } = req.query;
 
-      if (!q || typeof q !== "string") {
+
+      if (!query || typeof query !== "string") {
+
         throw new BadRequestError("Search query 'q' is required");
       }
 
@@ -268,7 +270,8 @@ export class ArticleController {
         filters.category = category;
       }
 
-      const result = await articleService.searchArticles(q, filters);
+      const result = await articleService.searchArticles(query, filters);
+
 
       res.json({
         message: "Search completed successfully",

@@ -26,17 +26,21 @@ router.get(
   articleController.verifyArticleSubmission.bind(articleController)
 );
 
-// PUBLIC: Get article preview (no auth required)
-router.get(
-  "/:id/preview",
-  articleController.getArticlePreview.bind(articleController)
-);
 
 // PUBLIC: Search articles (no auth required)
 router.get(
   "/search",
   articleController.searchArticles.bind(articleController)
 );
+
+
+// PUBLIC: Get article preview (no auth required)
+router.get(
+  "/:id/preview",
+  articleController.getArticlePreview.bind(articleController)
+);
+
+
 
 // Protected routes - Require authentication
 router.use(requireAuth);

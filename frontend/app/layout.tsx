@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "./components/Navbar";
 import StoreProvider from "./components/storeProvider"; 
+import Footer from "./components/Footer";
 
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="min-h-screen">
             {children}
           </main>
+          <Footer/>
         </StoreProvider>
         
         {/* ✅ ToastContainer Settings - Exactly wahi jo Adminlogin ke liye chahiye */}
