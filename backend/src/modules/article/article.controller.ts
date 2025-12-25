@@ -108,7 +108,6 @@ export class ArticleController {
 
   // Editor or Admin approves article (Option A)
   async approveArticle(req: AuthRequest, res: Response) {
-    console.log("APPROVE USER 👉", req.user); 
     try {
       const articleId = req.params.id;
       if (!articleId) {
@@ -286,11 +285,9 @@ export class ArticleController {
   // Search articles (public endpoint)
   async searchArticles(req: AuthRequest, res: Response) {
     try {
-      const { query, category, page, limit } = req.query;
+      const { q, category, page, limit } = req.query;
 
-
-      if (!query || typeof query !== "string") {
-
+      if (!q || typeof q !== "string") {
         throw new BadRequestError("Search query 'q' is required");
       }
 
@@ -308,8 +305,7 @@ export class ArticleController {
         filters.category = category;
       }
 
-      const result = await articleService.searchArticles(query, filters);
-
+      const result = await articleService.searchArticles(q, filters);
 
       res.json({
         message: "Search completed successfully",

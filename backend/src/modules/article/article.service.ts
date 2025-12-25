@@ -264,7 +264,7 @@ export class ArticleService {
     const updatedArticle = await prisma.article.update({
       where: { id: articleId },
       data: {
-        status: "PUBLISHED",
+        status: "APPROVED",
         approvedAt: new Date(),
         reviewedAt: new Date(),
       },
@@ -385,52 +385,64 @@ export class ArticleService {
   }
 
   // Get single article details (full access - for logged-in users)
- async getArticleById(articleId: string) {
-  const article = await prisma.article.findUnique({
-    where: { id: articleId }, // ✅ Ab Editor ko pending articles bhi dikhenge
-    include: {
-      assignedEditor: { select: { id: true, name: true, email: true } },
-      revisions: { orderBy: { createdAt: "desc" } },
-    },
-  });
+  async getArticleById(articleId: string) {
+    const article = await prisma.article.findUnique({
+      where: { 
+        id: articleId,
+        status: "APPROVED"  // Only show approved articles
+      },
+      include: {
+        assignedEditor: {
+          select: { id: true, name: true, email: true },
+        },
+        revisions: {
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    });
 
-  if (!article) throw new NotFoundError("Article not found");
-  return article;
-}
+    if (!article) {
+      throw new NotFoundError("Article not found or not published");
+    }
+
+    return article;
+  }
 
   // Get article preview (limited access - for non-logged-in users)
-  // Get article preview (limited access - for non-logged-in users)
-  async getArticlePreview(articleId: string) {
-    const article = await prisma.article.findUnique({
-      where: { 
-        id: articleId, 
-        status: "PUBLISHED" 
-      }, 
-      select: {
-        id: true,
-        title: true,
-        category: true,
-        abstract: true,
-        authorName: true,
-        authorOrganization: true,
-        keywords: true,
-        submittedAt: true,
-      },
-    });
+  async getArticlePreview(articleId: string) {
+    const article = await prisma.article.findUnique({
+      where: { 
+        id: articleId, 
+        status: "APPROVED" // Only show approved articles
+      },
+      select: {
+        id: true,
+        title: true,
+        category: true,
+        abstract: true,
+        authorName: true,
+        authorOrganization: true,
+        keywords: true,
+        submittedAt: true,
+        // NO PDF URLs - this is the key difference
+        // NO revisions
+        // NO assigned editor
+      },
+    });
 
-    if (!article) {
-      throw new NotFoundError("Article not found or not published");
-    }
+    if (!article) {
+      throw new NotFoundError("Article not found or not published");
+    }
 
-    return article;
-  }
+    return article;
+  }
 
   // Get PDF URL for download (for logged-in users)
   async getArticlePdfUrl(articleId: string) {
     const article = await prisma.article.findUnique({
       where: { 
         id: articleId, 
-        status: "PUBLISHED" 
+        status: "APPROVED" 
       },
       select: { 
         currentPdfUrl: true,
@@ -600,25 +612,22 @@ export class ArticleService {
   }
 
   // Search articles using PostgreSQL Full-Text Search
- // Search articles using PostgreSQL Full-Text Search
-// Search articles using PostgreSQL Full-Text Search
-// ArticleService.ts mein is function ko replace karein
-async searchArticles(
-  searchQuery: string,
-  filters: {
-    category?: string;
-    page?: number;
-    limit?: number;
-  }
-) {
-  const page = filters.page || 1;
-  const limit = filters.limit || 20;
-  const skip = (page - 1) * limit;
+  async searchArticles(
+    searchQuery: string,
+    filters: {
+      category?: string;
+      page?: number;
+      limit?: number;
+    }
+  ) {
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
+    const skip = (page - 1) * limit;
 
-  // Category filter setup
-  const categoryFilter = filters.category && filters.category !== 'all'
-    ? Prisma.sql`AND category = ${filters.category}`
-    : Prisma.empty;
+    // Build category filter
+    const categoryFilter = filters.category
+      ? Prisma.sql`AND category = ${filters.category}`
+      : Prisma.empty;
 
     // PostgreSQL Full-Text Search query with relevance ranking
     const searchResults = await prisma.$queryRaw<any[]>`
@@ -669,19 +678,19 @@ async searchArticles(
         ${categoryFilter}
     `;
 
-  const total = countResult[0]?.total || 0;
+    const total = Number(countResult[0]?.total || 0);
 
-  return {
-    results: searchResults,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-    },
-    query: searchQuery,
-  };
-}
+    return {
+      results: searchResults,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+      query: searchQuery,
+    };
+  }
 }
 
 export const articleService = new ArticleService();

@@ -6,12 +6,6 @@ import { articleController } from "./article.controller.js";
 
 const router = Router();
 
-// List articles with filters
-router.get(
-  "/",
-  articleController.listArticles.bind(articleController)
-);
-
 // Public/Optional Auth routes - Works for both guest and logged-in users
 router.post(
   "/submit",
@@ -77,7 +71,12 @@ router.patch(
   articleController.uploadCorrectedPdf.bind(articleController)
 );
 
-
+// List articles with filters
+router.get(
+  "/",
+  requirePermission("article", "read"),
+  articleController.listArticles.bind(articleController)
+);
 
 // PROTECTED: Download article PDF (auth required)
 router.get(
