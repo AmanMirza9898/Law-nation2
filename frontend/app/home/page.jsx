@@ -16,12 +16,13 @@
 
     // 2. Updated useEffect
     // Isse useEffect ke upar (BAHAR) rakho taaki Search button bhi ise use kar sake
+ // Purane fetchArticles ki jagah ye naya wala paste karein
   const fetchArticles = async (searchQuery = "") => {
     setIsLoading(true);
     if (searchQuery) setIsSearching(true);
 
     try {
-      // URL mein 'query' naam ka param bhejo kyunki backend wahi mang raha hai
+      // Backend ko 'query' param chahiye
       let url = searchQuery 
         ? `${API_BASE_URL}/api/articles/search?query=${encodeURIComponent(searchQuery)}`
         : `${API_BASE_URL}/api/articles?status=PUBLISHED`;
@@ -29,11 +30,15 @@
       const res = await fetch(url);
       const data = await res.json();
 
-      // Backend 'results' key mein data bhej raha hai search ke liye
-      const list = data.results || data.articles || [];
+      // DEBUG: Console mein zaroor check karein ki data aa raha hai
+      console.log("Backend Response:", data);
+
+      // Backend 'results' bhej raha hai search ke liye, hum usey yahan catch kar rahe hain
+      const list = data.results || data.articles || data.data || [];
       setPublishedArticles(list);
     } catch (error) {
       console.error("Fetch error:", error);
+      toast.error("Failed to load articles");
     } finally {
       setIsLoading(false);
       setIsSearching(false);
