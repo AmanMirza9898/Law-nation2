@@ -488,10 +488,10 @@ export default function SubmitPaperPage() {
                     >
                       <option value="">Select a format</option>
                       <option value="research-paper">Research Paper</option>
-                      <option value="book-chapter">Book Chapter</option>
+                      {/* <option value="book-chapter">Book Chapter</option> */}
                       <option value="review-article">Review Article</option>
                       <option value="case-study">Case Study</option>
-                      <option value="opinion-piece">Opinion Piece</option>
+                      {/* <option value="opinion-piece">Opinion Piece</option> */}
                       <option value="other">Other</option>
                     </select>
                   </div>

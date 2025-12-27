@@ -225,7 +225,10 @@ export class ArticleService {
   }
 
   // Step 3 - Option A: Editor or Admin approves directly
-  async approveArticle(articleId: string, userId: string, userRoles: string[]) {
+ // Step 3 - Option A: Editor or Admin approves directly
+  // ✅ CHANGE: Added 'newPdfUrl' parameter
+  async approveArticle(articleId: string, userId: string, userRoles: string[], newPdfUrl?: string) {
+    
     const article = await prisma.article.findUnique({
       where: { id: articleId },
     });
@@ -261,13 +264,33 @@ export class ArticleService {
       }
     }
 
+    // ✅ CHANGE: Dynamic update object
+    const updateData: any = {
+      status: "PUBLISHED",
+      approvedAt: new Date(),
+      reviewedAt: new Date(),
+    };
+
+    // ✅ CHANGE: Logic to replace PDF if new file is provided
+    if (newPdfUrl) {
+      console.log(`♻️ Replacing PDF for article ${articleId} on approval`);
+      updateData.currentPdfUrl = newPdfUrl;
+      
+      // Optional: Extract text from new PDF for search indexing
+      try {
+        const pdfContent = await extractPdfContent(newPdfUrl);
+        if (pdfContent.text) {
+          updateData.content = pdfContent.text;
+          updateData.contentHtml = pdfContent.html;
+        }
+      } catch (e) {
+        console.error("Failed to extract content from new approval PDF", e);
+      }
+    }
+
     const updatedArticle = await prisma.article.update({
       where: { id: articleId },
-      data: {
-        status: "PUBLISHED",
-        approvedAt: new Date(),
-        reviewedAt: new Date(),
-      },
+      data: updateData, // ✅ Using dynamic data
     });
 
     // Send approval email
@@ -475,34 +498,66 @@ export class ArticleService {
   }
 
   // Get article content for reading (text + HTML format)
-  async getArticleContent(articleId: string) {
-    const article = await prisma.article.findUnique({
-      where: {
-        id: articleId,
-        status: "PUBLISHED", // Only published articles
-      },
-      select: {
-        id: true,
-        title: true,
-        abstract: true,
-        category: true,
-        keywords: true,
-        authorName: true,
-        authorOrganization: true,
-        content: true,
-        contentHtml: true,
-        currentPdfUrl: true,
-        submittedAt: true,
-        approvedAt: true,
-      },
-    });
+  // Get article content for reading (public endpoint)
+async getArticleContent(articleId: string) {
+  const article = await prisma.article.findUnique({
+    where: {
+      id: articleId,
+      status: "PUBLISHED",
+    },
+    select: {
+      id: true,
+      title: true,
+      abstract: true,
+      category: true,
+      keywords: true,
+      authorName: true,
+      authorOrganization: true,
+      content: true,
+      contentHtml: true,
+      currentPdfUrl: true,
+      submittedAt: true,
+      approvedAt: true,
+    },
+  });
 
-    if (!article) {
-      throw new NotFoundError("Article not found or not published");
-    }
-
-    return article;
+  if (!article) {
+    throw new NotFoundError("Article not found or not published");
   }
+
+  // ✅ NEW: Lazy extraction - extract content on-demand if missing
+  if (!article.content || article.content.trim().length === 0) {
+    console.log(`⚡ [Lazy Extract] Content missing for article ${articleId}, extracting now...`);
+    
+    try {
+      const pdfContent = await extractPdfContent(article.currentPdfUrl);
+      
+      if (pdfContent.text && pdfContent.text.length > 0) {
+        console.log(`✅ [Lazy Extract] Extracted ${pdfContent.text.length} characters`);
+        
+        // Update database with extracted content
+        await prisma.article.update({
+          where: { id: articleId },
+          data: {
+            content: pdfContent.text,
+            contentHtml: pdfContent.html,
+          },
+        });
+        
+        // Update the article object to return
+        article.content = pdfContent.text;
+        article.contentHtml = pdfContent.html;
+      } else {
+        console.warn(`⚠️ [Lazy Extract] No text extracted (might be scanned PDF)`);
+      }
+    } catch (error) {
+      console.error(`❌ [Lazy Extract] Failed:`, error);
+      // Continue without content - frontend will show "Preview unavailable"
+    }
+  }
+
+  return article;
+}
 
   // Get article upload history (revisions)
   async getArticleHistory(articleId: string) {

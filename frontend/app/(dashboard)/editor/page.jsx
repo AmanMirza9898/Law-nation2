@@ -89,43 +89,88 @@ export default function EditorDashboard() {
   };
 
  const handleArticleAction = async (articleId, actionType) => {
+    try {
+      const token = localStorage.getItem("editorToken");
+      const endpoint = actionType === "approve" ? "approve" : "reject";
+
+      // ✅ 1. Request Options banao (Headers set karo)
+      let requestOptions = {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          // Note: Yahan 'Content-Type' mat lagana agar file bhej rahe ho
+        },
+      };
+
+      // ✅ 2. Agar Approve button dabaya aur File bhi hai -> FormData use karo
+      if (actionType === "approve" && uploadedFile) {
+        const formData = new FormData();
+        formData.append("pdf", uploadedFile); // Backend 'file' naam dhundega
+        requestOptions.body = formData;
+      } 
+      // ✅ 3. Agar file nahi hai -> Normal JSON use karo
+      else {
+        requestOptions.headers["Content-Type"] = "application/json";
+        requestOptions.body = JSON.stringify({});
+      }
+
+      const res = await fetch(
+        `${API_BASE_URL}/api/articles/${articleId}/${endpoint}`,
+        requestOptions // 👈 Modified options pass kiye
+      );
+
+      if (res.ok) {
+        const successMsg = actionType === "approve" 
+            ? "Article Approved & Published Successfully!" 
+            : "Article Rejected";
+            
+        toast.success(successMsg);
+        
+        setSelectedArticle(null);
+        setUploadedFile(null); 
+        fetchAssignedArticles(profile.id || profile._id, token);
+      } else {
+        const errorData = await res.json();
+        toast.error(errorData.message || "Failed to process action");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Server error while publishing");
+    }
+  };
+
+// ✅ NEW: Reject karne par Article Delete karne ka function
+  const handleRejectAndDelete = async (articleId) => {
+    // Safety check: Pucchna zaroori hai galti se delete na ho jaye
+    if (!window.confirm("Are you sure you want to REJECT and DELETE this article? This cannot be undone.")) {
+      return;
+    }
+
     try {
       const token = localStorage.getItem("editorToken");
-      
-      // ✅ Agar approve hai to backend ka same /approve endpoint hit hoga jo Admin use karta hai
-      const endpoint = actionType === "approve" ? "approve" : "reject";
 
-      const res = await fetch(
-        `${API_BASE_URL}/api/articles/${articleId}/${endpoint}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-           
-        }
-      );
+      // DELETE Request
+      const res = await fetch(`${API_BASE_URL}/api/articles/${articleId}`, {
+        method: "DELETE", // ✅ Method DELETE use hoga
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (res.ok) {
-        // ✅ UI Update: Message exactly Admin jaisa kar diya
-        const successMsg = actionType === "approve" 
-            ? "Article Approved & Published Successfully!" 
-            : "Article Rejected";
-            
-        toast.success(successMsg);
+        toast.success("Article Rejected & Deleted Successfully!");
         
+        // Modal band karein aur list refresh karein
         setSelectedArticle(null);
-        setUploadedFile(null); 
-        // List refresh karein taaki status update dikhe
+        setUploadedFile(null);
         fetchAssignedArticles(profile.id || profile._id, token);
       } else {
         const errorData = await res.json();
-        toast.error(errorData.message || "Failed to process action");
+        toast.error(errorData.message || "Failed to delete article");
       }
     } catch (err) {
-      console.error(err);
-      toast.error("Server error while publishing");
+      console.error("Delete Error:", err);
+      toast.error("Server error while deleting");
     }
   };
 
@@ -366,10 +411,12 @@ export default function EditorDashboard() {
 
               {/* ✅ MODIFIED: Buttons (Removed Correction) */}
              {/* ✅ MODIFIED: Buttons (Fixed ID Issue) */}
+{/* ✅ MODIFIED: Buttons Section */}
 <div className="p-6 border-t bg-gray-50 space-y-3">
+  
+  {/* Approve Button (Ye waisa hi rahega - File Upload wala) */}
   <button
     onClick={() =>
-      // 👇 FIX: Yahan check lagaya hai ki '_id' use kare ya 'id' taaki undefined na ho
       handleArticleAction(selectedArticle._id || selectedArticle.id, "approve")
     }
     className="w-full py-3 bg-red-600 text-white font-bold rounded-lg text-sm hover:bg-black transition-all shadow-lg hover:shadow-xl"
@@ -377,14 +424,15 @@ export default function EditorDashboard() {
     Approve & Publish
   </button>
   
+  {/* 🔴 REJECT BUTTON (Updated to Delete) */}
   <button
     onClick={() =>
-      // 👇 FIX: Same fix yahan bhi
-      handleArticleAction(selectedArticle._id || selectedArticle.id, "reject")
+      // 👇 Ab ye Delete wala function call karega
+      handleRejectAndDelete(selectedArticle._id || selectedArticle.id)
     }
-    className="w-full py-3 bg-white border border-gray-300 text-gray-700 font-bold rounded-lg text-sm hover:bg-gray-100 transition-all"
+    className="w-full py-3 bg-white border border-gray-300 text-gray-700 font-bold rounded-lg text-sm hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all"
   >
-    Reject Article
+    Reject & Delete Article
   </button>
 </div>
             </div>

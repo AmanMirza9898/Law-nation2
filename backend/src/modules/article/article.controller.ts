@@ -107,6 +107,7 @@ export class ArticleController {
   }
 
   // Editor or Admin approves article (Option A)
+  // Editor or Admin approves article (Option A)
   async approveArticle(req: AuthRequest, res: Response) {
     try {
       const articleId = req.params.id;
@@ -117,10 +118,16 @@ export class ArticleController {
       const userId = req.user!.id;
       const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
 
-      const article = await articleService.approveArticle(articleId, userId, userRoles);
+      // ✅ CHANGE 1: Check karo agar nayi PDF file upload hui hai
+      const newPdfUrl = req.fileMeta?.url; 
+
+      // ✅ CHANGE 2: Service function mein newPdfUrl pass karo
+      const article = await articleService.approveArticle(articleId, userId, userRoles, newPdfUrl);
 
       res.json({
-        message: "Article approved successfully",
+        message: newPdfUrl 
+          ? "Article updated via upload and published successfully" 
+          : "Article approved successfully",
         article,
       });
     } catch (error) {
