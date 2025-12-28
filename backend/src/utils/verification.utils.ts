@@ -112,12 +112,36 @@ export class VerificationService {
 
     for (const record of expiredRecords) {
       try {
-        // Delete temporary file if it exists
+        // Delete temporary files if they exist
         if (record.resourceType === 'ARTICLE' && record.metadata) {
           const metadata = record.metadata as any;
+          
+          // Delete temp PDF
           if (metadata.tempPdfPath) {
             await this.deleteTempFile(metadata.tempPdfPath);
             filesDeleted++;
+          }
+          
+          // ✅ NEW: Delete temp Word file
+          if (metadata.tempWordPath) {
+            await this.deleteTempFile(metadata.tempWordPath);
+            filesDeleted++;
+          }
+          
+          // ✅ Delete temp thumbnail
+          if (metadata.thumbnailUrl && metadata.thumbnailUrl.includes('/temp/')) {
+            await this.deleteTempFile(metadata.thumbnailUrl);
+            filesDeleted++;
+          }
+          
+          // ✅ Delete temp images
+          if (metadata.imageUrls && Array.isArray(metadata.imageUrls)) {
+            for (const imageUrl of metadata.imageUrls) {
+              if (imageUrl.includes('/temp/')) {
+                await this.deleteTempFile(imageUrl);
+                filesDeleted++;
+              }
+            }
           }
         }
 
@@ -141,10 +165,20 @@ export class VerificationService {
   private static async deleteTempFile(filePath: string) {
     try {
       const fullPath = path.join(process.cwd(), filePath);
+      
+      // Check if file exists before trying to delete
+      try {
+        await fs.access(fullPath);
+      } catch {
+        // File doesn't exist, skip deletion
+        console.log(`⚠️  Temp file already deleted: ${filePath}`);
+        return;
+      }
+      
       await fs.unlink(fullPath);
-      console.log(`Deleted temp file: ${filePath}`);
+      console.log(`🗑️  Deleted temp file: ${filePath}`);
     } catch (error) {
-      console.error(`Failed to delete temp file ${filePath}:`, error);
+      console.error(`❌ Failed to delete temp file ${filePath}:`, error);
     }
   }
 
@@ -153,11 +187,20 @@ export class VerificationService {
    */
   static async moveTempFile(tempPath: string): Promise<string> {
     const filename = path.basename(tempPath);
-    const permanentPath = `uploads/pdfs/${filename}`;
+    
+    // Determine if it's a PDF or image based on path
+    const isPdf = tempPath.includes('/pdfs/') || tempPath.includes('uploads/temp/') && !tempPath.includes('/images/');
+    const permanentDir = isPdf ? 'uploads/pdfs/' : 'uploads/images/';
+    const permanentPath = `${permanentDir}${filename}`;
+    
     const tempFullPath = path.join(process.cwd(), tempPath);
     const permanentFullPath = path.join(process.cwd(), permanentPath);
 
     try {
+      // Ensure permanent directory exists
+      const permanentDirPath = path.join(process.cwd(), permanentDir);
+      await fs.mkdir(permanentDirPath, { recursive: true });
+      
       await fs.rename(tempFullPath, permanentFullPath);
       console.log(`Moved file from ${tempPath} to ${permanentPath}`);
       return permanentPath;

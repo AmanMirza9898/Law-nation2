@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth, optionalAuth } from "@/middlewares/auth.middleware.js";
 import { requirePermission } from "@/middlewares/require-premission.middleware.js";
-import { uploadPdf ,uploadOptionalPdf } from "@/middlewares/upload.middleware.js";
+import { uploadDocument, uploadPdfOnly, uploadOptionalPdf, uploadImage, uploadMultipleImages, uploadArticleFiles } from "@/middlewares/upload.middleware.js";
 import { articleController } from "./article.controller.js";
 
 const router = Router();
@@ -10,7 +10,7 @@ const router = Router();
 router.post(
   "/submit",
   optionalAuth, // Check auth but don't require it
-  uploadPdf,
+  uploadDocument, // Accept PDF or Word from users
   articleController.submitArticle.bind(articleController)
 );
 
@@ -46,13 +46,28 @@ router.get(
   articleController.getArticleHistory.bind(articleController)
 );
 
+// PUBLIC: Get article content for reading (optional auth - works for both logged and non-logged users)
+router.get(
+  "/:id/content",
+  optionalAuth,
+  articleController.getArticleContent.bind(articleController)
+);
+
 // Protected routes - Require authentication
 router.use(requireAuth);
 
-// PROTECTED: Get article content for reading (auth required)
-router.get(
-  "/:id/content",
-  articleController.getArticleContent.bind(articleController)
+// PROTECTED: Upload thumbnail for article
+router.post(
+  "/:id/upload-thumbnail",
+  uploadImage,
+  articleController.uploadThumbnail.bind(articleController)
+);
+
+// PROTECTED: Upload multiple images for article
+router.post(
+  "/:id/upload-images",
+  uploadMultipleImages("images", 10),
+  articleController.uploadImages.bind(articleController)
 );
 
 // Admin: Assign editor to article
@@ -70,11 +85,11 @@ router.patch(
   articleController.approveArticle.bind(articleController)
 );
 
-// Editor: Upload corrected PDF (Option C)
+// Editor: Upload corrected PDF or Word (Option C)
 router.patch(
   "/:id/upload-corrected",
   requirePermission("article", "write"),
-  uploadPdf,
+  uploadDocument, // Editor can upload PDF or Word
   articleController.uploadCorrectedPdf.bind(articleController)
 );
 
@@ -85,7 +100,21 @@ router.get(
   articleController.listArticles.bind(articleController)
 );
 
-// PROTECTED: Download article PDF (auth required)
+// PROTECTED: Download article PDF (auth required - all logged-in users)
+router.get(
+  "/:id/download/pdf",
+  requireAuth,
+  articleController.downloadArticlePdf.bind(articleController)
+);
+
+// PROTECTED: Download article Word (auth required - all logged-in users)
+router.get(
+  "/:id/download/word",
+  requireAuth,
+  articleController.downloadArticleWord.bind(articleController)
+);
+
+// LEGACY: Keep old download route for backward compatibility (downloads PDF)
 router.get(
   "/:id/download",
   requireAuth,
