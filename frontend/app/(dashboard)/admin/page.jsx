@@ -19,6 +19,9 @@ const StatCard = ({ title, count }) => (
 export default function AdminDashboard() {
   const router = useRouter();
 
+  // ✅ 0. UI STATE (Responsive Sidebar)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   // ✅ 1. SECURITY STATES
   const [currentAdmin, setCurrentAdmin] = useState({
     name: "Admin",
@@ -149,7 +152,6 @@ export default function AdminDashboard() {
   const [showAbstract, setShowAbstract] = useState(null);
 
   // ✅ ASSIGN LOGIC
-  // ✅ ASSIGN LOGIC (FIXED)
   const assignArticle = async (articleId, editorId) => {
     if (!editorId) return;
 
@@ -219,7 +221,7 @@ export default function AdminDashboard() {
       } else {
         const errorData = await response.json();
         // Server jo error bhej raha hai wo dikhao
-        console.error("Server Error:", errorData); 
+        console.error("Server Error:", errorData);
         toast.error(errorData.message || "Approval failed");
       }
     } catch (e) {
@@ -273,19 +275,43 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50 flex-col md:flex-row">
-      {/* SIDEBAR */}
-      <aside className="hidden md:flex w-72 bg-red-700 text-white flex-col h-screen sticky top-0 shadow-2xl">
-        <div className="p-8 border-b border-red-800">
-          <h1 className="text-2xl font-black italic tracking-tighter">
-            LAW NATION
-          </h1>
-          <span className="text-[10px] bg-white text-red-700 px-2 py-0.5 rounded-full font-bold uppercase mt-2 inline-block">
-            Admin Panel
-          </span>
+    <div className="flex min-h-screen bg-gray-50 flex-col md:flex-row relative">
+      
+      {/* 🌑 MOBILE OVERLAY (Backdrop) */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* 🔴 SIDEBAR (Responsive) */}
+      <aside 
+        className={`fixed md:sticky top-0 h-screen w-72 bg-red-700 text-white flex flex-col shadow-2xl z-50 transition-transform duration-300 ease-in-out
+        ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+      >
+        <div className="p-8 border-b border-red-800 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-black italic tracking-tighter">
+              LAW NATION
+            </h1>
+            <span className="text-[10px] bg-white text-red-700 px-2 py-0.5 rounded-full font-bold uppercase mt-2 inline-block">
+              Admin Panel
+            </span>
+          </div>
+          {/* Close Button Mobile */}
+          <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-white">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
+
         <nav className="flex-1 px-4 mt-6 space-y-2">
-          <button className="w-full text-left p-3 bg-red-800 rounded-lg font-bold">
+          <button 
+            onClick={() => setIsMobileMenuOpen(false)} 
+            className="w-full text-left p-3 bg-red-800 rounded-lg font-bold"
+          >
             Dashboard
           </button>
           <Link
@@ -312,18 +338,32 @@ export default function AdminDashboard() {
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 overflow-y-auto pb-10">
-        <header className="bg-white h-20 border-b flex items-center justify-between px-6 md:px-10 shadow-sm sticky top-0 z-10">
-          <h2 className="text-xl font-black text-gray-700 uppercase">
-            Management
-          </h2>
-          <div className="flex items-center gap-6">
+      <main className="flex-1 h-screen overflow-y-auto bg-gray-50 flex flex-col">
+        
+        {/* HEADER */}
+        <header className="bg-white h-20 border-b flex items-center justify-between px-4 md:px-10 shadow-sm sticky top-0 z-20 shrink-0">
+          <div className="flex items-center gap-3">
+             {/* Hamburger Button (Mobile Only) */}
+             <button 
+              onClick={() => setIsMobileMenuOpen(true)} 
+              className="md:hidden text-gray-600 hover:text-red-700 p-1"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            </button>
+            <h2 className="text-lg md:text-xl font-black text-gray-700 uppercase">
+              Management
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-2 md:gap-6">
             <Link href="/admin/add-editor">
-              <button className="bg-red-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-black transition-all text-xs">
+              <button className="bg-red-600 text-white px-3 py-2 md:px-5 md:py-2 rounded-lg font-bold hover:bg-black transition-all text-[10px] md:text-xs">
                 + CREATE EDITOR
               </button>
             </Link>
-            <div className="flex items-center gap-3 pl-6 border-l border-gray-200">
+            <div className="flex items-center gap-3 pl-3 md:pl-6 border-l border-gray-200">
               <div className="text-right hidden md:block">
                 <p className="text-sm font-bold text-gray-800">
                   {currentAdmin.name}
@@ -332,7 +372,7 @@ export default function AdminDashboard() {
                   Administrator
                 </p>
               </div>
-              <div className="w-10 h-10 rounded-full bg-red-100 border-2 border-red-600 text-red-700 flex items-center justify-center font-black text-lg">
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-red-100 border-2 border-red-600 text-red-700 flex items-center justify-center font-black text-sm md:text-lg">
                 {currentAdmin.name
                   ? currentAdmin.name.charAt(0).toUpperCase()
                   : "A"}
@@ -341,8 +381,9 @@ export default function AdminDashboard() {
           </div>
         </header>
 
-        <div className="p-6 md:p-10 space-y-10">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* CONTENT */}
+        <div className="p-4 md:p-10 space-y-6 md:space-y-10 flex-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             <StatCard title="Total Submissions" count={articles.length} />
             <StatCard
               title="Awaiting"
@@ -355,20 +396,131 @@ export default function AdminDashboard() {
             />
           </div>
 
+
+          {/* 📊 START: PRO ANALYTICS SECTION */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8 mb-8">
+            
+            {/* 1. MAIN CHART: Submissions vs Approvals (Double Bar) */}
+            <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-gray-100 shadow-lg">
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h3 className="text-sm font-black text-gray-800 uppercase tracking-tighter">
+                    Submission Trends
+                  </h3>
+                  <p className="text-xs text-gray-500 font-medium mt-1">
+                    Comparison: Received vs Published
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <div className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-gray-300"></span>
+                    <span className="text-[10px] font-bold text-gray-500">Received</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-red-600"></span>
+                    <span className="text-[10px] font-bold text-gray-500">Published</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Chart Area with Grid Background */}
+              <div className="relative h-64 w-full border-b border-gray-200">
+                {/* Background Grid Lines (0%, 25%, 50%, 75%, 100%) */}
+                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                  {[100, 75, 50, 25, 0].map((val) => (
+                    <div key={val} className="w-full border-t border-dashed border-gray-100 relative">
+                      <span className="absolute -left-8 -top-2 text-[10px] text-gray-400 font-bold">{val}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Bars Container */}
+                <div className="absolute inset-0 flex items-end justify-between px-2 pl-4">
+                  {[
+                    { day: "Mon", v1: 60, v2: 40 },
+                    { day: "Tue", v1: 45, v2: 25 },
+                    { day: "Wed", v1: 80, v2: 55 },
+                    { day: "Thu", v1: 50, v2: 30 },
+                    { day: "Fri", v1: 90, v2: 70 },
+                    { day: "Sat", v1: 35, v2: 20 },
+                    { day: "Sun", v1: 75, v2: 60 },
+                  ].map((data, i) => (
+                    <div key={i} className="flex flex-col items-center gap-1 group w-full">
+                      {/* Bar Group */}
+                      <div className="flex gap-1 h-full items-end">
+                        {/* Bar 1 (Gray) */}
+                        <div 
+                          className="w-2 md:w-4 bg-gray-300 rounded-t-sm hover:bg-gray-400 transition-all duration-300"
+                          style={{ height: `${data.v1}%` }}
+                        ></div>
+                        {/* Bar 2 (Red) */}
+                        <div 
+                          className="w-2 md:w-4 bg-red-600 rounded-t-sm shadow-md hover:bg-red-700 transition-all duration-300"
+                          style={{ height: `${data.v2}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-[10px] font-bold text-gray-400 mt-2">{data.day}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 2. SIDE WIDGET: Editor Performance (Donut Style) */}
+            <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-lg flex flex-col justify-between">
+              <div>
+                <h3 className="text-sm font-black text-gray-800 uppercase tracking-tighter mb-1">
+                  System Health
+                </h3>
+                <p className="text-xs text-gray-500 mb-6">Article Review Efficiency</p>
+                
+                {/* CSS Conic Gradient Donut Chart */}
+                <div className="flex items-center justify-center py-4">
+                  <div className="relative w-40 h-40 rounded-full bg-gray-100 flex items-center justify-center"
+                       style={{ background: 'conic-gradient(#DC2626 75%, #F3F4F6 0)' }} // Red 75% filled
+                  >
+                    <div className="w-28 h-28 bg-white rounded-full flex flex-col items-center justify-center shadow-inner">
+                      <span className="text-3xl font-black text-gray-800">75%</span>
+                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Efficiency</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mini List */}
+              <div className="space-y-3 mt-4">
+                <div className="flex justify-between items-center text-xs font-bold border-b border-gray-50 pb-2">
+                  <span className="text-gray-500">Active Editors</span>
+                  <span className="text-gray-800">12 Online</span>
+                </div>
+                <div className="flex justify-between items-center text-xs font-bold border-b border-gray-50 pb-2">
+                  <span className="text-gray-500">Pending Reviews</span>
+                  <span className="text-red-600">08 Urgent</span>
+                </div>
+                <div className="flex justify-between items-center text-xs font-bold">
+                  <span className="text-gray-500">Avg. Time</span>
+                  <span className="text-green-600">2.5 Days</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+          {/* 📊 END: PRO ANALYTICS SECTION */}
+
           <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-            <div className="bg-gray-50 p-5 border-b flex flex-col md:flex-row justify-between items-center gap-4">
-              <div className="font-black text-gray-700 uppercase tracking-tighter text-lg">
+            <div className="bg-gray-50 p-5 border-b flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="font-black text-gray-700 uppercase tracking-tighter text-base md:text-lg">
                 Monitor & Assign Articles
               </div>
-              <div className="flex gap-2 w-full md:w-auto">
+              <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
                 <input
                   type="text"
                   placeholder="Search articles..."
-                  className="p-2 border rounded-lg text-xs outline-none focus:border-red-600 w-full"
+                  className="p-2 border rounded-lg text-xs outline-none focus:border-red-600 w-full sm:w-auto"
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
                 <select
-                  className="p-2 border rounded-lg text-xs font-bold outline-none cursor-pointer"
+                  className="p-2 border rounded-lg text-xs font-bold outline-none cursor-pointer w-full sm:w-auto"
                   onChange={(e) => setStatusFilter(e.target.value)}
                 >
                   <option value="All">All Status</option>
@@ -465,7 +617,7 @@ export default function AdminDashboard() {
                           </select>
                         </td>
 
-                        {/* 5. Combined Actions (Publish + Delete) ✅ FIXED THIS */}
+                        {/* 5. Combined Actions (Publish + Delete) */}
                         <td className="p-5 text-right flex justify-end gap-3 items-center">
                           <button
                             onClick={() => overrideAndPublish(art.id)}

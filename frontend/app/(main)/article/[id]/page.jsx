@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useSelector } from 'react-redux';
+import { toast } from 'react-toastify';
 
-// Simple Icons (You can replace these with Lucide-react or Heroicons)
+// Simple Icons
 const ArrowLeftIcon = () => (
   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
 );
@@ -14,25 +16,54 @@ const DownloadIcon = () => (
 
 export default function ArticlePage() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id;
+
+  // Backend URL define karein (Taaki PDF sahi jagah se uthaye)
+  const API_BASE_URL = "http://localhost:4000";
+
+  const { token } = useSelector((state) => state.auth);
 
   const [article, setArticle] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
+  // ✅ HELPER FUNCTION: PDF ka sahi URL banane ke liye
+  const getPdfUrl = (url) => {
+    if (!url) return "#";
+    // Agar URL pehle se full hai (Cloudinary/S3 wagera), toh wahi return karo
+    if (url.startsWith("http")) return url;
+    // Agar local path hai, toh uske aage http://localhost:4000 jodo
+    return `${API_BASE_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+  };
+
   useEffect(() => {
     if (!id) return;
+
+    if (!token) {
+        toast.warning("Please login to read the full article.");
+        router.push("/login"); 
+        return;
+    }
 
     const fetchArticleData = async () => {
       try {
         setLoading(true);
-        // Best practice: Use ENV variable or absolute path
-        const res = await fetch(`http://localhost:4000/api/articles/${id}/content`);
+        // Backend API call
+        const res = await fetch(`${API_BASE_URL}/api/articles/${id}/content`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            }
+        });
+        
         const data = await res.json();
 
         if (res.ok && data.article) {
           setArticle(data.article);
         } else {
+          console.error("Error from backend:", data.message);
           setError(true);
         }
       } catch (err) {
@@ -44,9 +75,8 @@ export default function ArticlePage() {
     };
 
     fetchArticleData();
-  }, [id]);
+  }, [id, token, router]);
 
-  // --- 1. Minimal Skeleton Loader (Professional Feel) ---
   if (loading) return (
     <div className="max-w-3xl mx-auto py-20 px-6 animate-pulse">
       <div className="h-4 bg-gray-200 rounded w-1/4 mb-6"></div>
@@ -63,12 +93,11 @@ export default function ArticlePage() {
     </div>
   );
 
-  // --- 2. Minimal 404 State ---
   if (error || !article) return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center">
       <h2 className="text-2xl font-semibold text-gray-900 mb-2">Article unavailable</h2>
-      <p className="text-gray-500 mb-6">The article you are looking for has been moved or deleted.</p>
-      <Link href="/" className="flex items-center text-sm font-medium text-gray-900 hover:underline">
+      <p className="text-gray-500 mb-6">The article you are looking for has been moved, deleted, or you don't have permission to view it.</p>
+      <Link href="/law/home" className="flex items-center text-sm font-medium text-gray-900 hover:underline">
         <ArrowLeftIcon /> Back to Library
       </Link>
     </div>
@@ -78,12 +107,13 @@ export default function ArticlePage() {
     <article className="min-h-screen bg-white font-sans text-gray-900">
       <div className="max-w-3xl mx-auto py-16 px-6 sm:px-8">
         
-        {/* Navigation Breadcrumb */}
-        <Link href="/home" className="inline-flex items-center text-sm text-gray-500 hover:text-black mb-8 transition-colors">
+        <button 
+            onClick={() => router.back()} 
+            className="inline-flex items-center text-sm text-gray-500 hover:text-black mb-8 transition-colors"
+        >
            <ArrowLeftIcon /> Back
-        </Link>
+        </button>
 
-        {/* Header Section */}
         <header className="mb-10">
           <div className="flex items-center gap-3 mb-6">
             <span className="text-xs font-semibold tracking-wider uppercase text-blue-600">
@@ -110,9 +140,10 @@ export default function ArticlePage() {
               </div>
             </div>
 
+            {/* ✅ FIX: PDF URL function use kiya */}
             {article.currentPdfUrl && (
               <a 
-                href={article.currentPdfUrl} 
+                href={getPdfUrl(article.currentPdfUrl)} 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="hidden sm:flex items-center text-sm font-medium text-gray-600 hover:text-black border border-gray-200 rounded-full px-4 py-2 hover:border-gray-400 transition-all"
@@ -123,14 +154,12 @@ export default function ArticlePage() {
           </div>
         </header>
 
-        {/* Abstract / Lead Paragraph */}
         {article.abstract && (
           <div className="text-xl text-gray-600 leading-relaxed mb-10 not-italic font-normal">
             {article.abstract}
           </div>
         )}
 
-        {/* Main Content Area using Tailwind Typography Plugin */}
         <div className="prose prose-lg prose-slate max-w-none prose-headings:font-bold prose-a:text-blue-600 hover:prose-a:text-blue-500 prose-img:rounded-xl">
           {article.contentHtml ? (
             <div dangerouslySetInnerHTML={{ __html: article.contentHtml }} />
@@ -145,11 +174,11 @@ export default function ArticlePage() {
           )}
         </div>
 
-        {/* Mobile-only Download Button (Sticky Bottom or Footer) */}
+        {/* ✅ FIX: Mobile button me bhi URL fix kiya */}
         {article.currentPdfUrl && (
             <div className="mt-16 pt-8 border-t border-gray-100 sm:hidden">
                  <a 
-                href={article.currentPdfUrl} 
+                href={getPdfUrl(article.currentPdfUrl)} 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="flex items-center justify-center w-full bg-black text-white text-sm font-medium px-6 py-4 rounded-lg active:scale-95 transition-transform"

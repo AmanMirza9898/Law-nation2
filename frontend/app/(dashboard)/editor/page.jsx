@@ -21,12 +21,18 @@ export default function EditorDashboard() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [activeTab, setActiveTab] = useState("tasks");
+  const [pdfViewMode, setPdfViewMode] = useState("original");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // New State for Mobile Menu
+
   const [articles, setArticles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // ✅ CHANGED: Feedback hata kar File state add kiya
   const [uploadedFile, setUploadedFile] = useState(null);
-  
+  // 📊 Chart Data Calculations
+  const totalTasks = articles.length || 0;
+  const completedTasks = articles.filter(a => a.status === "Published").length || 0;
+  const pendingTasks = articles.filter(a => a.status !== "Published").length || 0;
+  const efficiency = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
   const API_BASE_URL = "http://localhost:4000";
 
   const [profile, setProfile] = useState({
@@ -88,89 +94,42 @@ export default function EditorDashboard() {
     }
   };
 
- const handleArticleAction = async (articleId, actionType) => {
-    try {
-      const token = localStorage.getItem("editorToken");
-      const endpoint = actionType === "approve" ? "approve" : "reject";
-
-      // ✅ 1. Request Options banao (Headers set karo)
-      let requestOptions = {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          // Note: Yahan 'Content-Type' mat lagana agar file bhej rahe ho
-        },
-      };
-
-      // ✅ 2. Agar Approve button dabaya aur File bhi hai -> FormData use karo
-      if (actionType === "approve" && uploadedFile) {
-        const formData = new FormData();
-        formData.append("pdf", uploadedFile); // Backend 'file' naam dhundega
-        requestOptions.body = formData;
-      } 
-      // ✅ 3. Agar file nahi hai -> Normal JSON use karo
-      else {
-        requestOptions.headers["Content-Type"] = "application/json";
-        requestOptions.body = JSON.stringify({});
-      }
-
-      const res = await fetch(
-        `${API_BASE_URL}/api/articles/${articleId}/${endpoint}`,
-        requestOptions // 👈 Modified options pass kiye
-      );
-
-      if (res.ok) {
-        const successMsg = actionType === "approve" 
-            ? "Article Approved & Published Successfully!" 
-            : "Article Rejected";
-            
-        toast.success(successMsg);
-        
-        setSelectedArticle(null);
-        setUploadedFile(null); 
-        fetchAssignedArticles(profile.id || profile._id, token);
-      } else {
-        const errorData = await res.json();
-        toast.error(errorData.message || "Failed to process action");
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Server error while publishing");
-    }
-  };
-
-// ✅ NEW: Reject karne par Article Delete karne ka function
-  const handleRejectAndDelete = async (articleId) => {
-    // Safety check: Pucchna zaroori hai galti se delete na ho jaye
-    if (!window.confirm("Are you sure you want to REJECT and DELETE this article? This cannot be undone.")) {
-      return;
-    }
-
+  const handleArticleAction = async (articleId, actionType) => {
     try {
       const token = localStorage.getItem("editorToken");
+      const endpoint = actionType === "approve" ? "approve" : "reject";
 
-      // DELETE Request
-      const res = await fetch(`${API_BASE_URL}/api/articles/${articleId}`, {
-        method: "DELETE", // ✅ Method DELETE use hoga
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      let requestOptions = {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+      };
+
+      if (actionType === "approve" && uploadedFile) {
+        const formData = new FormData();
+        formData.append("pdf", uploadedFile);
+        requestOptions.body = formData;
+      } else {
+        requestOptions.headers["Content-Type"] = "application/json";
+        requestOptions.body = JSON.stringify({});
+      }
+
+      const res = await fetch(
+        `${API_BASE_URL}/api/articles/${articleId}/${endpoint}`,
+        requestOptions
+      );
 
       if (res.ok) {
-        toast.success("Article Rejected & Deleted Successfully!");
-        
-        // Modal band karein aur list refresh karein
+        toast.success(actionType === "approve" ? "Article Published!" : "Article Rejected");
         setSelectedArticle(null);
         setUploadedFile(null);
         fetchAssignedArticles(profile.id || profile._id, token);
       } else {
         const errorData = await res.json();
-        toast.error(errorData.message || "Failed to delete article");
+        toast.error(errorData.message || "Action failed");
       }
     } catch (err) {
-      console.error("Delete Error:", err);
-      toast.error("Server error while deleting");
+      console.error(err);
+      toast.error("Server error");
     }
   };
 
@@ -180,265 +139,267 @@ export default function EditorDashboard() {
     router.push("/admin-login");
   };
 
-  // Helper to handle file selection
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       setUploadedFile(e.target.files[0]);
     }
   };
 
-  if (!isAuthorized)
-    return (
-      <div className="h-screen flex items-center justify-center">
-        Verifying...
-      </div>
-    );
+  const getPdfUrlToView = () => {
+    if (!selectedArticle) return "";
+    const path = pdfViewMode === "original" ? selectedArticle.originalPdfUrl : selectedArticle.currentPdfUrl;
+    if (!path) return "";
+    return path.startsWith("http") ? path : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+  };
+
+  if (!isAuthorized) return <div className="h-screen flex items-center justify-center">Verifying...</div>;
 
   return (
-    <div className="flex min-h-screen bg-gray-50 flex-col md:flex-row">
-      {/* SIDEBAR */}
-      <aside className="hidden md:flex w-72 bg-red-700 text-white flex-col shadow-2xl sticky top-0 h-screen">
-        <div className="p-8 border-b border-red-800">
-          <h1 className="text-2xl font-black italic tracking-tighter">
-            LAW NATION
-          </h1>
-          <span className="text-[10px] bg-white text-red-700 px-2 py-0.5 rounded-full font-bold uppercase">
-            Editor Panel
-          </span>
+    <div className="flex min-h-screen bg-gray-50 flex-col md:flex-row relative">
+
+      {/* 🌑 MOBILE OVERLAY (Backdrop) */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* 🔴 SIDEBAR (Responsive) */}
+      <aside 
+        className={`fixed md:sticky top-0 z-40 h-screen w-72 bg-red-700 text-white flex flex-col shadow-2xl transition-transform duration-300 ease-in-out 
+        ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+      >
+        <div className="p-8 border-b border-red-800 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-black italic tracking-tighter">LAW NATION</h1>
+            <span className="text-[10px] bg-white text-red-700 px-2 py-0.5 rounded-full font-bold uppercase">
+              {selectedArticle ? "Review Mode" : "Editor Panel"}
+            </span>
+          </div>
+          {/* Close Button Mobile */}
+          <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-white">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-        <nav className="flex-1 px-4 mt-6 space-y-2">
-          <button
-            onClick={() => setActiveTab("tasks")}
-            className={`w-full text-left p-3 rounded-lg font-semibold transition-all ${
-              activeTab === "tasks" ? "bg-red-800" : "hover:bg-red-600"
-            }`}
-          >
-            Assigned Tasks
-          </button>
-          <button
-            onClick={() => setActiveTab("profile")}
-            className={`w-full text-left p-3 rounded-lg font-semibold transition-all ${
-              activeTab === "profile" ? "bg-red-800" : "hover:bg-red-600"
-            }`}
-          >
-            Profile Settings
-          </button>
+
+        <nav className="flex-1 px-4 mt-6 space-y-2 overflow-y-auto">
+          {!selectedArticle ? (
+            <>
+              <button
+                onClick={() => { setActiveTab("tasks"); setIsMobileMenuOpen(false); }}
+                className={`w-full text-left p-3 rounded-lg font-semibold transition-all ${activeTab === "tasks" ? "bg-red-800" : "hover:bg-red-600"}`}
+              >
+                 Assigned Tasks
+              </button>
+              <button
+                onClick={() => { setActiveTab("profile"); setIsMobileMenuOpen(false); }}
+                className={`w-full text-left p-3 rounded-lg font-semibold transition-all ${activeTab === "profile" ? "bg-red-800" : "hover:bg-red-600"}`}
+              >
+                 Profile Settings
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="px-3 py-2 text-xs font-bold text-red-200 uppercase tracking-widest border-b border-red-600 mb-2">
+                Document Options
+              </div>
+              
+              <button
+                onClick={() => { setPdfViewMode("original"); setIsMobileMenuOpen(false); }}
+                className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${pdfViewMode === 'original' ? 'bg-white text-red-700 shadow-lg' : 'hover:bg-red-800 text-white'}`}
+              >
+                 View Original PDF
+                {pdfViewMode === 'original' && <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">Active</span>}
+              </button>
+
+              <button
+                onClick={() => { setPdfViewMode("current"); setIsMobileMenuOpen(false); }}
+                className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${pdfViewMode === 'current' ? 'bg-white text-red-700 shadow-lg' : 'hover:bg-red-800 text-white'}`}
+              >
+                 View Edited PDF
+                {pdfViewMode === 'current' && <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">Active</span>}
+              </button>
+
+              <div className="my-6 border-t border-red-800"></div>
+
+              <button
+                onClick={() => {
+                  setSelectedArticle(null);
+                  setUploadedFile(null);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full text-left p-3 rounded-lg font-semibold bg-red-900 text-red-100 hover:bg-black hover:text-white transition-all flex items-center gap-2"
+              >
+                ⬅ Back to Task List
+              </button>
+            </>
+          )}
         </nav>
-        <div className="p-4 border-t border-red-800">
-          <button
-            onClick={handleLogout}
-            className="w-full p-2 text-sm bg-red-900 rounded font-medium uppercase"
-          >
-            Logout
-          </button>
-        </div>
+
+        {!selectedArticle && (
+          <div className="p-4 border-t border-red-800">
+            <button onClick={handleLogout} className="w-full p-2 text-sm bg-red-900 rounded font-medium uppercase">Logout</button>
+          </div>
+        )}
       </aside>
 
-      {/* MAIN CONTENT AREA */}
-      <main className="flex-1 overflow-y-auto h-screen">
-        <header className="bg-white h-20 border-b flex items-center justify-between px-6 md:px-10 sticky top-0 z-10">
-          <h2 className="text-xl font-bold text-gray-700">
-            {activeTab === "tasks" ? "Editor Workspace" : "Profile"}
-          </h2>
+      {/* 🟢 MAIN CONTENT AREA */}
+      <main className="flex-1 h-screen overflow-y-auto bg-white flex flex-col">
+        
+        {/* HEADER */}
+        <header className="bg-white h-20 border-b flex items-center justify-between px-4 md:px-10 sticky top-0 z-20 shadow-sm shrink-0">
           <div className="flex items-center gap-3">
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-bold text-gray-800">{profile.name}</p>
-              <p className="text-[10px] text-red-600 font-bold uppercase">
-                {profile.role}
-              </p>
-            </div>
-            <div className="w-10 h-10 bg-red-100 border-2 border-red-600 rounded-full flex items-center justify-center text-red-700 font-black">
+            {/* Hamburger Button (Visible only on Mobile) */}
+            <button 
+              onClick={() => setIsMobileMenuOpen(true)} 
+              className="md:hidden text-gray-600 hover:text-red-700 p-1"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            </button>
+
+            <h2 className="text-lg md:text-xl font-bold text-gray-700 truncate max-w-[200px] md:max-w-none">
+              {selectedArticle ? `Reviewing: ${selectedArticle.title.substring(0, 30)}...` : (activeTab === "tasks" ? "Editor Workspace" : "Profile")}
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-3">
+             <div className="w-10 h-10 bg-red-100 border-2 border-red-600 rounded-full flex items-center justify-center text-red-700 font-black">
               {profile.name.charAt(0)}
             </div>
           </div>
         </header>
 
-        <div className="p-6 md:p-10 pb-20">
-          {activeTab === "tasks" && (
+        
+
+        {/* CONTENT SWITCHER */}
+        <div className="p-4 md:p-10 pb-20 flex-1">
+          
+          {/* VIEW 1: TASK LIST (Default) */}
+          {!selectedArticle && activeTab === "tasks" && (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-                <EditorStatCard
-                  title="Total Assigned"
-                  count={articles.length}
-                  color="border-red-600"
-                />
-                <EditorStatCard
-                  title="Pending"
-                  count={articles.filter((a) => a.status !== "Published").length}
-                  color="border-yellow-500"
-                />
-                <EditorStatCard
-                  title="Approved"
-                  count={articles.filter((a) => a.status === "Published").length}
-                  color="border-green-600"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-8">
+                <EditorStatCard title="Total Assigned" count={articles.length} color="border-red-600" />
+                <EditorStatCard title="Pending" count={articles.filter((a) => a.status !== "Published").length} color="border-yellow-500" />
+                <EditorStatCard title="Approved" count={articles.filter((a) => a.status === "Published").length} color="border-green-600" />
               </div>
 
               <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-                <div className="bg-red-50 p-5 border-b border-red-100">
-                  <h3 className="font-bold text-red-800 text-lg">My Tasks</h3>
-                </div>
+                <div className="bg-red-50 p-5 border-b border-red-100"><h3 className="font-bold text-red-800 text-lg">My Tasks</h3></div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left">
+                  <table className="w-full text-left whitespace-nowrap">
                     <thead>
                       <tr className="text-xs uppercase bg-gray-50 text-gray-400">
-                        <th className="p-5">Article</th>
-                        <th className="p-5">Author</th>
-                        <th className="p-5">Status</th>
-                        <th className="p-5 text-right">Action</th>
+                        <th className="p-5">Article</th><th className="p-5">Author</th><th className="p-5">Status</th><th className="p-5 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {isLoading ? (
-                        <tr>
-                          <td colSpan="4" className="p-10 text-center">
-                            Loading...
-                          </td>
-                        </tr>
-                      ) : (
+                      {isLoading ? <tr><td colSpan="4" className="p-10 text-center">Loading...</td></tr> : 
                         articles.map((art) => (
-                          <tr
-                            key={art._id || art.id}
-                            className="hover:bg-gray-50"
-                          >
+                          <tr key={art._id || art.id} className="hover:bg-gray-50">
                             <td className="p-5 font-medium">{art.title}</td>
-                            <td className="p-5 text-sm">
-                              {art.authorName || "Author"}
-                            </td>
-                            <td className="p-5">
-                              <span className="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded-full">
-                                {art.status}
-                              </span>
-                            </td>
+                            <td className="p-5 text-sm">{art.authorName}</td>
+                            <td className="p-5"><span className="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded-full">{art.status}</span></td>
                             <td className="p-5 text-right">
                               <button
-                                onClick={() => setSelectedArticle(art)}
-                                className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-lg"
+                                onClick={() => {
+                                  setSelectedArticle(art);
+                                  setPdfViewMode("original"); // Reset view
+                                }}
+                                className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-800 transition"
                               >
                                 Open Review
                               </button>
                             </td>
                           </tr>
                         ))
-                      )}
+                      }
                     </tbody>
                   </table>
                 </div>
               </div>
             </>
           )}
-        </div>
-      </main>
 
-      {/* FULL REVIEW MODAL */}
-      {selectedArticle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-6xl h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row">
-            {/* LEFT: PREVIEW */}
-            <div className="flex-1 bg-gray-50 flex flex-col border-r border-gray-300">
-              <div className="p-4 bg-white border-b flex justify-between">
-                <span className="text-xs font-black text-red-600">
-                  DOCUMENT VIEWER
-                </span>
-                <button onClick={() => {
-                    setSelectedArticle(null);
-                    setUploadedFile(null);
-                }}>
-                  CLOSE ✕
-                </button>
-              </div>
-              <div className="flex-1 p-8 overflow-y-auto bg-white m-4 rounded shadow-sm">
-                <h1 className="text-2xl font-bold mb-4">
-                  {selectedArticle.title}
-                </h1>
-                <p className="mb-6 text-gray-600 italic">
-                  "{selectedArticle.abstract}"
-                </p>
-                {selectedArticle.currentPdfUrl && (
-                  <button
-                    onClick={() => {
-                      const path = selectedArticle.currentPdfUrl;
-                      const cleanPath = path.startsWith("/") ? path : `/${path}`;
-                      const fullUrl = `${API_BASE_URL}${cleanPath}`;
-                      window.open(fullUrl, "_blank");
-                    }}
-                    className="bg-black text-white px-6 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-red-700 transition-all"
-                  >
-                    VIEW FULL PDF
-                  </button>
-                )}
-              </div>
-            </div>
+  
+          
 
-            {/* RIGHT: ACTIONS (MODIFIED SECTION) */}
-            <div className="w-full md:w-[400px] flex flex-col bg-white">
-              <div className="p-6 bg-red-600 text-white">
-                <h2 className="font-bold uppercase truncate">
-                  {selectedArticle.title}
-                </h2>
-              </div>
+          {/* VIEW 2: ARTICLE REVIEW INTERFACE */}
+          {selectedArticle && (
+            <div className="flex flex-col lg:flex-row gap-6 h-auto lg:h-full">
               
-              {/* ✅ NEW: File Upload Section (Replaced Feedback) */}
-              <div className="p-6 flex-1 flex flex-col gap-4">
-                <label className="text-xs font-bold text-gray-500 uppercase">
-                  Upload Reviewed Document
-                </label>
-                
-                <div className="flex-1 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:bg-red-50 hover:border-red-300 transition-colors relative flex flex-col items-center justify-center text-center p-4">
-                  <input 
-                    type="file" 
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    onChange={handleFileChange}
-                  />
-                  
-                  {uploadedFile ? (
-                    <div className="flex flex-col items-center animate-pulse">
-                        <span className="text-3xl mb-2">📄</span>
-                        <p className="text-sm font-bold text-gray-800 break-all px-2">
-                           {uploadedFile.name}
-                        </p>
-                        <p className="text-xs text-green-600 font-bold mt-1">Ready to upload</p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center text-gray-400">
-                        <svg className="w-10 h-10 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                        <p className="text-sm font-medium">Click to upload file</p>
-                        <p className="text-xs mt-1">PDF, DOCX supported</p>
-                    </div>
+              {/* PDF VIEWER SECTION */}
+              <div className="flex-1 bg-gray-100 rounded-xl border border-gray-300 p-4 flex flex-col h-[500px] lg:h-auto min-h-[500px]">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-bold text-gray-700 uppercase text-sm md:text-base">
+                    {pdfViewMode === 'original' ? '📂 Original Submission' : '📝 Latest Edited Version'}
+                  </h3>
+                  {getPdfUrlToView() && (
+                    <a href={getPdfUrlToView()} target="_blank" className="text-xs text-blue-600 hover:underline">Open in New Tab ↗</a>
                   )}
+                </div>
+                
+                <div className="flex-1 bg-white rounded-lg shadow-inner flex items-center justify-center border-2 border-dashed border-gray-300 relative overflow-hidden">
+                   {getPdfUrlToView() ? (
+                     <iframe 
+                       src={getPdfUrlToView()} 
+                       className="w-full h-full absolute inset-0"
+                       title="PDF Viewer"
+                     />
+                   ) : (
+                     <div className="text-center text-gray-400">
+                       <p className="text-4xl mb-2">📄</p>
+                       <p>PDF not available for this version</p>
+                     </div>
+                   )}
                 </div>
               </div>
 
-              {/* ✅ MODIFIED: Buttons (Removed Correction) */}
-             {/* ✅ MODIFIED: Buttons (Fixed ID Issue) */}
-{/* ✅ MODIFIED: Buttons Section */}
-<div className="p-6 border-t bg-gray-50 space-y-3">
-  
-  {/* Approve Button (Ye waisa hi rahega - File Upload wala) */}
-  <button
-    onClick={() =>
-      handleArticleAction(selectedArticle._id || selectedArticle.id, "approve")
-    }
-    className="w-full py-3 bg-red-600 text-white font-bold rounded-lg text-sm hover:bg-black transition-all shadow-lg hover:shadow-xl"
-  >
-    Approve & Publish
-  </button>
-  
-  {/* 🔴 REJECT BUTTON (Updated to Delete) */}
-  <button
-    onClick={() =>
-      // 👇 Ab ye Delete wala function call karega
-      handleRejectAndDelete(selectedArticle._id || selectedArticle.id)
-    }
-    className="w-full py-3 bg-white border border-gray-300 text-gray-700 font-bold rounded-lg text-sm hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all"
-  >
-    Reject & Delete Article
-  </button>
-</div>
+              {/* ACTION PANEL (Right Side on Desktop, Bottom on Mobile) */}
+              <div className="w-full lg:w-[350px] space-y-6 shrink-0">
+                <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                  <h3 className="font-bold text-gray-800 mb-4">Action Panel</h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Upload Reviewed Version</label>
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 transition cursor-pointer relative">
+                        <input type="file" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+                        {uploadedFile ? (
+                           <p className="text-sm font-bold text-green-600 truncate">{uploadedFile.name}</p>
+                        ) : (
+                           <p className="text-xs text-gray-400">Click to upload PDF</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={() => handleArticleAction(selectedArticle._id || selectedArticle.id, "approve")}
+                      className="w-full py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow-md transition"
+                    >
+                      ✅ Approve & Publish
+                    </button>
+                    
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 p-6 rounded-xl border border-blue-100">
+                  <h4 className="text-sm font-bold text-blue-800 mb-2">Article Details</h4>
+                  <p className="text-sm text-gray-600 mb-1"><strong>Author:</strong> {selectedArticle.authorName}</p>
+                  <p className="text-sm text-gray-600 mb-1"><strong>Status:</strong> {selectedArticle.status}</p>
+                  <p className="text-xs text-gray-500 mt-2 bg-white p-2 rounded border border-blue-100 italic break-words">"{selectedArticle.abstract}"</p>
+                </div>
+              </div>
+
             </div>
-          </div>
+          )}
+
         </div>
-      )}
+      </main>
     </div>
   );
 }

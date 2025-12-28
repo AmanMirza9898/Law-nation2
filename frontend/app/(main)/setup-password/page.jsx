@@ -20,9 +20,9 @@ function SetupForm() {
   // Agar URL mein token nahi hai
   if (!token) {
     return (
-      <div className="text-center p-10">
-        <h2 className="text-red-600 font-bold text-xl">Invalid Link</h2>
-        <p className="text-gray-500 mt-2">No verification token found. Please check your email again.</p>
+      <div className="w-full max-w-md p-8 text-center border border-red-200 bg-red-50 rounded">
+        <h2 className="text-red-700 font-bold text-lg uppercase tracking-wide">Invalid Link</h2>
+        <p className="text-red-600 text-sm mt-2">No verification token found. Please check your email again.</p>
       </div>
     );
   }
@@ -56,13 +56,11 @@ function SetupForm() {
         toast.success("Password set successfully!");
         
         // 🚨 3. REDIRECT FIX: Saara purana local storage saaf karein
-        // Taaki pehle se save koi Admin Token interference na kare
         localStorage.clear(); 
         sessionStorage.clear();
 
         // 4. Forceful Redirect to Login Page
         setTimeout(() => {
-          // window.location use karne se page refresh hota hai aur state clean ho jati hai
           window.location.href = "/law/admin-login"; 
         }, 2000);
       } else {
@@ -77,33 +75,36 @@ function SetupForm() {
   };
 
   return (
-    <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border-t-4 border-red-600">
-      <div className="text-center mb-8">
+    <div className="w-full max-w-md bg-white border border-gray-300 rounded overflow-hidden">
+      {/* Header Section */}
+      <div className="p-8 text-center border-b border-gray-100">
         <h1 className="text-3xl font-black italic tracking-tighter text-red-700">LAW NATION</h1>
-        <p className="text-gray-500 font-medium mt-2">Welcome! Set up your password</p>
+        <p className="text-gray-500 text-sm mt-2 font-medium">Secure your account</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">New Password</label>
+      {/* Form Section */}
+      <form onSubmit={handleSubmit} className="p-8 space-y-6">
+        
+        <div className="space-y-2">
+          <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide">New Password</label>
           <input
             type="password"
             required
             minLength={6}
-            className="w-full p-3 bg-gray-50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 transition-all font-bold"
+            className="w-full p-3 bg-white border border-gray-300 rounded text-sm text-gray-800 focus:border-red-700 focus:outline-none transition-colors"
             placeholder="Min 6 characters"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
 
-        <div>
-          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Confirm Password</label>
+        <div className="space-y-2">
+          <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide">Confirm Password</label>
           <input
             type="password"
             required
             minLength={6}
-            className="w-full p-3 bg-gray-50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 transition-all font-bold"
+            className="w-full p-3 bg-white border border-gray-300 rounded text-sm text-gray-800 focus:border-red-700 focus:outline-none transition-colors"
             placeholder="Re-enter password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
@@ -113,11 +114,11 @@ function SetupForm() {
         <button
           type="submit"
           disabled={loading}
-          className={`w-full py-3 rounded-lg text-white font-bold uppercase tracking-wider transition-all ${
-            loading ? "bg-gray-400 cursor-wait" : "bg-red-700 hover:bg-black"
+          className={`w-full py-3 rounded text-white font-bold text-sm uppercase tracking-wider transition-colors ${
+            loading ? "bg-red-400 cursor-wait" : "bg-red-700 hover:bg-black"
           }`}
         >
-          {loading ? "Activating Account..." : "Create Account & Login"}
+          {loading ? "Activating..." : "Set Password & Login"}
         </button>
       </form>
     </div>
@@ -127,9 +128,9 @@ function SetupForm() {
 // Main Page Component
 export default function SetupPasswordPage() {
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <ToastContainer position="top-center" autoClose={2000} />
-      <Suspense fallback={<div className="text-red-700 font-bold animate-pulse">Loading...</div>}>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <ToastContainer position="top-center" autoClose={2000} theme="colored" />
+      <Suspense fallback={<div className="text-gray-500 font-bold text-sm">Loading Interface...</div>}>
         <SetupForm />
       </Suspense>
     </div>

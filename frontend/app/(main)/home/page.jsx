@@ -338,7 +338,7 @@ export default function HomePage() {
           <div className="mb-12">
             {/* text-center se headline beech mein aa jayegi, agar left mein chahiye toh text-center hata dena */}
             <h2 className="text-4xl font-bold text-black leading-tight text-center">
-              Network <span className="text-gray-900">Spotlight</span>
+              All <span className="text-gray-900">Articles</span>
             </h2>
           </div>
 
