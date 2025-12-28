@@ -11,6 +11,7 @@ import {
 } from "@/utils/email.utils.js";
 import { VerificationService } from "@/utils/verification.utils.js";
 import { extractPdfContent } from "@/utils/pdf-extract.utils.js";
+import { ensureBothFormats, getFileType } from "@/utils/file-conversion.utils.js";
 import type {
   ArticleSubmissionData,
   ArticleVerificationMetadata,
@@ -33,16 +34,13 @@ export class ArticleService {
 
   // Create article directly for logged-in users (no verification needed)
   private async createArticleDirectly(data: ArticleSubmissionData, userId: string) {
-    // Extract text content from PDF
-    let pdfContent = { text: "", html: "" };
-    try {
-      pdfContent = await extractPdfContent(data.pdfUrl);
-    } catch (error) {
-      console.error("Failed to extract PDF content:", error);
-      // Continue without content - PDF will still be available for download
-    }
-
-    // Create article in database immediately
+    const fileType = getFileType(data.pdfUrl);
+    
+    // Convert to ensure both formats exist
+    console.log(`📄 [Logged-in User] Converting file to both formats: ${data.pdfUrl}`);
+    const { pdfPath, wordPath } = await ensureBothFormats(data.pdfUrl);
+    
+    // Create article first to get ID
     const article = await prisma.article.create({
       data: {
         authorName: data.authorName,
@@ -55,11 +53,31 @@ export class ArticleService {
         ...(data.keywords && { keywords: data.keywords }),
         ...(data.coAuthors && { coAuthors: data.coAuthors }),
         ...(data.remarksToEditor && { remarksToEditor: data.remarksToEditor }),
-        originalPdfUrl: data.pdfUrl,
-        currentPdfUrl: data.pdfUrl,
+        originalPdfUrl: pdfPath,
+        currentPdfUrl: pdfPath,
+        originalWordUrl: wordPath,
+        currentWordUrl: wordPath,
+        originalFileType: fileType,
+        status: "PENDING_ADMIN_REVIEW",
+      },
+    });
+
+    // Extract text content and images from PDF
+    let pdfContent = { text: "", html: "", images: [] as string[] };
+    try {
+      pdfContent = await extractPdfContent(pdfPath, article.id);
+    } catch (error) {
+      console.error("Failed to extract PDF content:", error);
+      // Continue without content - PDF will still be available for download
+    }
+
+    // Update article with extracted content and images
+    const updatedArticle = await prisma.article.update({
+      where: { id: article.id },
+      data: {
         content: pdfContent.text || null,
         contentHtml: pdfContent.html || null,
-        status: "PENDING_ADMIN_REVIEW",
+        imageUrls: pdfContent.images || [],
       },
     });
 
@@ -68,12 +86,12 @@ export class ArticleService {
       data.authorEmail,
       data.authorName,
       data.title,
-      article.id
+      updatedArticle.id
     );
 
     return {
       message: 'Article submitted successfully',
-      article,
+      article: updatedArticle,
       requiresVerification: false,
     };
   }
@@ -116,26 +134,22 @@ export class ArticleService {
     const metadata = verification.data as unknown as ArticleVerificationMetadata;
 
     // Move file from temp to permanent directory
-    let permanentPdfUrl = metadata.pdfUrl;
+    let permanentFileUrl = metadata.pdfUrl;
     if (metadata.tempPdfPath && metadata.tempPdfPath.includes('/temp/')) {
       try {
-        permanentPdfUrl = await VerificationService.moveTempFile(metadata.tempPdfPath);
+        permanentFileUrl = await VerificationService.moveTempFile(metadata.tempPdfPath);
       } catch (error) {
         console.error('Failed to move temp file:', error);
         // Continue with temp path if move fails
       }
     }
 
-    // Extract text content from PDF
-    let pdfContent = { text: "", html: "" };
-    try {
-      pdfContent = await extractPdfContent(permanentPdfUrl);
-    } catch (error) {
-      console.error("Failed to extract PDF content:", error);
-      // Continue without content - PDF will still be available for download
-    }
+    // Detect file type and convert to both formats
+    const fileType = getFileType(permanentFileUrl);
+    console.log(`📄 [Guest Verification] Converting file to both formats: ${permanentFileUrl}`);
+    const { pdfPath, wordPath } = await ensureBothFormats(permanentFileUrl);
 
-    // Create article in database
+    // Create article first to get ID
     const article = await prisma.article.create({
       data: {
         authorName: metadata.authorName,
@@ -148,11 +162,31 @@ export class ArticleService {
         ...(metadata.keywords && { keywords: metadata.keywords }),
         ...(metadata.coAuthors && { coAuthors: metadata.coAuthors }),
         ...(metadata.remarksToEditor && { remarksToEditor: metadata.remarksToEditor }),
-        originalPdfUrl: permanentPdfUrl,
-        currentPdfUrl: permanentPdfUrl,
+        originalPdfUrl: pdfPath,
+        currentPdfUrl: pdfPath,
+        originalWordUrl: wordPath,
+        currentWordUrl: wordPath,
+        originalFileType: fileType,
+        status: "PENDING_ADMIN_REVIEW",
+      },
+    });
+
+    // Extract text content and images from PDF
+    let pdfContent = { text: "", html: "", images: [] as string[] };
+    try {
+      pdfContent = await extractPdfContent(pdfPath, article.id);
+    } catch (error) {
+      console.error("Failed to extract PDF content:", error);
+      // Continue without content - PDF will still be available for download
+    }
+
+    // Update article with extracted content and images
+    const updatedArticle = await prisma.article.update({
+      where: { id: article.id },
+      data: {
         content: pdfContent.text || null,
         contentHtml: pdfContent.html || null,
-        status: "PENDING_ADMIN_REVIEW",
+        imageUrls: pdfContent.images || [],
       },
     });
 
@@ -165,10 +199,10 @@ export class ArticleService {
       metadata.authorEmail,
       metadata.authorName,
       metadata.title,
-      article.id
+      updatedArticle.id
     );
 
-    return article;
+    return updatedArticle;
   }
 
   // Step 2: Admin assigns editor
@@ -326,10 +360,15 @@ export class ArticleService {
       throw new BadRequestError("Article is not in correct status for corrections");
     }
 
-    // Extract text from corrected PDF
-    let pdfContent = { text: "", html: "" };
+    // Convert to ensure both formats exist
+    const fileType = getFileType(data.pdfUrl);
+    console.log(`📄 [Editor Upload] Converting file to both formats: ${data.pdfUrl}`);
+    const { pdfPath, wordPath } = await ensureBothFormats(data.pdfUrl);
+
+    // Extract text and images from corrected PDF
+    let pdfContent = { text: "", html: "", images: [] as string[] };
     try {
-      pdfContent = await extractPdfContent(data.pdfUrl);
+      pdfContent = await extractPdfContent(pdfPath, articleId);
     } catch (error) {
       console.error("Failed to extract PDF content:", error);
       // Continue without content - PDF will still be available for download
@@ -339,19 +378,22 @@ export class ArticleService {
     await prisma.articleRevision.create({
       data: {
         articleId: article.id,
-        pdfUrl: data.pdfUrl,
+        pdfUrl: pdfPath,
+        wordUrl: wordPath,
         uploadedBy: editorId,
         ...(data.comments && { comments: data.comments }),
       },
     });
 
-    // Update article with corrected PDF and extracted text
+    // Update article with corrected PDF/Word, extracted text, and images
     const updatedArticle = await prisma.article.update({
       where: { id: articleId },
       data: {
-        currentPdfUrl: data.pdfUrl,
+        currentPdfUrl: pdfPath,
+        currentWordUrl: wordPath,
         content: pdfContent.text || null,
         contentHtml: pdfContent.html || null,
+        imageUrls: pdfContent.images || [],
         status: "PENDING_APPROVAL",
         reviewedAt: new Date(),
       },
@@ -480,6 +522,30 @@ export class ArticleService {
     return article;
   }
 
+  // Get Word URL for download (for all logged-in users)
+  async getArticleWordUrl(articleId: string) {
+    const article = await prisma.article.findUnique({
+      where: { 
+        id: articleId, 
+        status: "PUBLISHED" 
+      },
+      select: { 
+        currentWordUrl: true,
+        title: true 
+      },
+    });
+
+    if (!article) {
+      throw new NotFoundError("Article not found or not published");
+    }
+
+    if (!article.currentWordUrl) {
+      throw new NotFoundError("Word version not available for this article");
+    }
+
+    return article;
+  }
+
   // Delete article (Admin only)
   async deleteArticle(articleId: string) {
     const article = await prisma.article.findUnique({
@@ -497,8 +563,8 @@ export class ArticleService {
     return { message: "Article deleted successfully" };
   }
 
-  // Get article content for reading (public endpoint)
-async getArticleContent(articleId: string) {
+  // Get article content for reading (public endpoint with optional auth)
+async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
   const article = await prisma.article.findUnique({
     where: {
       id: articleId,
@@ -515,6 +581,7 @@ async getArticleContent(articleId: string) {
       content: true,
       contentHtml: true,
       currentPdfUrl: true,
+      imageUrls: true,
       submittedAt: true,
       approvedAt: true,
     },
@@ -524,28 +591,30 @@ async getArticleContent(articleId: string) {
     throw new NotFoundError("Article not found or not published");
   }
 
-  // ✅ NEW: Lazy extraction - extract content on-demand if missing
+  // ✅ Lazy extraction - extract content on-demand if missing
   if (!article.content || article.content.trim().length === 0) {
     console.log(`⚡ [Lazy Extract] Content missing for article ${articleId}, extracting now...`);
     
     try {
-      const pdfContent = await extractPdfContent(article.currentPdfUrl);
+      const pdfContent = await extractPdfContent(article.currentPdfUrl, articleId);
       
       if (pdfContent.text && pdfContent.text.length > 0) {
-        console.log(`✅ [Lazy Extract] Extracted ${pdfContent.text.length} characters`);
+        console.log(`✅ [Lazy Extract] Extracted ${pdfContent.text.length} characters and ${pdfContent.images.length} images`);
         
-        // Update database with extracted content
+        // Update database with extracted content and images
         await prisma.article.update({
           where: { id: articleId },
           data: {
             content: pdfContent.text,
             contentHtml: pdfContent.html,
+            imageUrls: pdfContent.images || [],
           },
         });
         
         // Update the article object to return
         article.content = pdfContent.text;
         article.contentHtml = pdfContent.html;
+        article.imageUrls = pdfContent.images || [];
       } else {
         console.warn(`⚠️ [Lazy Extract] No text extracted (might be scanned PDF)`);
       }
@@ -555,7 +624,33 @@ async getArticleContent(articleId: string) {
     }
   }
 
-  return article;
+  // ✅ Limit content for non-authenticated users
+  if (!isAuthenticated && article.content) {
+    const words = article.content.split(/\s+/);
+    const wordLimit = 250; // 250 words (between 200-300)
+    
+    if (words.length > wordLimit) {
+      const limitedContent = words.slice(0, wordLimit).join(' ') + '...';
+      
+      console.log(`🔒 [Content Limit] Non-authenticated user - showing ${wordLimit}/${words.length} words`);
+      
+      return {
+        ...article,
+        content: limitedContent,
+        contentHtml: null, // Don't send HTML for limited preview
+        isLimited: true,
+        totalWords: words.length,
+        previewWords: wordLimit,
+      };
+    }
+  }
+
+  console.log(`✅ [Full Access] ${isAuthenticated ? 'Authenticated' : 'Guest'} user - full content available`);
+  
+  return {
+    ...article,
+    isLimited: false,
+  };
 }
 
 
@@ -666,11 +761,20 @@ async getArticleContent(articleId: string) {
     };
   }
 
-  // Search articles using PostgreSQL Full-Text Search
+  // Search articles using PostgreSQL Full-Text Search with enhanced filters
   async searchArticles(
     searchQuery: string,
     filters: {
       category?: string;
+      author?: string;
+      organization?: string;
+      keyword?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      sortBy?: 'relevance' | 'date' | 'title' | 'author';
+      sortOrder?: 'asc' | 'desc';
+      minScore?: number;
+      exclude?: string;
       page?: number;
       limit?: number;
     }
@@ -678,13 +782,73 @@ async getArticleContent(articleId: string) {
     const page = filters.page || 1;
     const limit = filters.limit || 20;
     const skip = (page - 1) * limit;
+    const sortBy = filters.sortBy || 'relevance';
+    const sortOrder = filters.sortOrder || 'desc';
+    const minScore = filters.minScore || 0;
 
     // Build category filter
     const categoryFilter = filters.category
       ? Prisma.sql`AND category = ${filters.category}`
       : Prisma.empty;
 
-    // PostgreSQL Full-Text Search query with relevance ranking
+    // Build author filter (case-insensitive partial match)
+    const authorFilter = filters.author
+      ? Prisma.sql`AND "authorName" ILIKE ${'%' + filters.author + '%'}`
+      : Prisma.empty;
+
+    // Build organization filter (case-insensitive partial match)
+    const organizationFilter = filters.organization
+      ? Prisma.sql`AND "authorOrganization" ILIKE ${'%' + filters.organization + '%'}`
+      : Prisma.empty;
+
+    // Build keyword filter (case-insensitive partial match)
+    const keywordFilter = filters.keyword
+      ? Prisma.sql`AND keywords ILIKE ${'%' + filters.keyword + '%'}`
+      : Prisma.empty;
+
+    // Build date range filter
+    let dateFilter = Prisma.empty;
+    if (filters.dateFrom && filters.dateTo) {
+      dateFilter = Prisma.sql`AND "approvedAt" BETWEEN ${filters.dateFrom}::timestamp AND ${filters.dateTo}::timestamp`;
+    } else if (filters.dateFrom) {
+      dateFilter = Prisma.sql`AND "approvedAt" >= ${filters.dateFrom}::timestamp`;
+    } else if (filters.dateTo) {
+      dateFilter = Prisma.sql`AND "approvedAt" <= ${filters.dateTo}::timestamp`;
+    }
+
+    // Build exclude filter (exclude articles containing certain words)
+    const excludeFilter = filters.exclude
+      ? Prisma.sql`AND NOT (
+          title ILIKE ${'%' + filters.exclude + '%'} OR
+          abstract ILIKE ${'%' + filters.exclude + '%'} OR
+          keywords ILIKE ${'%' + filters.exclude + '%'}
+        )`
+      : Prisma.empty;
+
+    // Build minimum score filter
+    const minScoreFilter = minScore > 0
+      ? Prisma.sql`AND relevance >= ${minScore}`
+      : Prisma.empty;
+
+    // Build ORDER BY clause based on sortBy parameter
+    let orderByClause;
+    switch (sortBy) {
+      case 'date':
+        orderByClause = Prisma.sql`ORDER BY "approvedAt" ${Prisma.raw(sortOrder.toUpperCase())}`;
+        break;
+      case 'title':
+        orderByClause = Prisma.sql`ORDER BY title ${Prisma.raw(sortOrder.toUpperCase())}`;
+        break;
+      case 'author':
+        orderByClause = Prisma.sql`ORDER BY "authorName" ${Prisma.raw(sortOrder.toUpperCase())}`;
+        break;
+      case 'relevance':
+      default:
+        orderByClause = Prisma.sql`ORDER BY relevance ${Prisma.raw(sortOrder.toUpperCase())}, "approvedAt" DESC`;
+        break;
+    }
+
+    // PostgreSQL Full-Text Search query with relevance ranking and all filters
     const searchResults = await prisma.$queryRaw<any[]>`
       SELECT 
         id, 
@@ -714,12 +878,18 @@ async getArticleContent(articleId: string) {
           coalesce(category, '')
         ) @@ plainto_tsquery('english', ${searchQuery})
         ${categoryFilter}
-      ORDER BY relevance DESC, "approvedAt" DESC
+        ${authorFilter}
+        ${organizationFilter}
+        ${keywordFilter}
+        ${dateFilter}
+        ${excludeFilter}
+        ${minScoreFilter}
+      ${orderByClause}
       LIMIT ${limit}
       OFFSET ${skip}
     `;
 
-    // Get total count for pagination
+    // Get total count for pagination (with same filters)
     const countResult = await prisma.$queryRaw<{ total: bigint }[]>`
       SELECT COUNT(*) as total
       FROM "Article"
@@ -731,6 +901,12 @@ async getArticleContent(articleId: string) {
           coalesce(category, '')
         ) @@ plainto_tsquery('english', ${searchQuery})
         ${categoryFilter}
+        ${authorFilter}
+        ${organizationFilter}
+        ${keywordFilter}
+        ${dateFilter}
+        ${excludeFilter}
+        ${minScoreFilter}
     `;
 
     const total = Number(countResult[0]?.total || 0);
@@ -744,7 +920,58 @@ async getArticleContent(articleId: string) {
         totalPages: Math.ceil(total / limit),
       },
       query: searchQuery,
+      filters: {
+        category: filters.category,
+        author: filters.author,
+        organization: filters.organization,
+        keyword: filters.keyword,
+        dateFrom: filters.dateFrom,
+        dateTo: filters.dateTo,
+        sortBy,
+        sortOrder,
+        minScore,
+        exclude: filters.exclude,
+      },
     };
+  }
+
+  // Upload thumbnail for existing article
+  async uploadThumbnail(articleId: string, thumbnailUrl: string) {
+    const article = await prisma.article.findUnique({
+      where: { id: articleId },
+    });
+
+    if (!article) {
+      throw new NotFoundError("Article not found");
+    }
+
+    const updatedArticle = await prisma.article.update({
+      where: { id: articleId },
+      data: { thumbnailUrl },
+    });
+
+    return updatedArticle;
+  }
+
+  // Upload multiple images for existing article
+  async uploadImages(articleId: string, imageUrls: string[]) {
+    const article = await prisma.article.findUnique({
+      where: { id: articleId },
+    });
+    
+    if (!article) {
+      throw new NotFoundError("Article not found");
+    }
+    
+    // Append new images to existing ones
+    const updatedImageUrls = [...(article.imageUrls || []), ...imageUrls];
+    
+    const updatedArticle = await prisma.article.update({
+      where: { id: articleId },
+      data: { imageUrls: updatedImageUrls },
+    });
+    
+    return updatedArticle;
   }
 }
 

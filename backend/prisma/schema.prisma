@@ -132,9 +132,16 @@ model Article {
   coAuthors         String?       @db.Text
   remarksToEditor   String?       @db.Text
   
-  // File Management
-  originalPdfUrl    String
-  currentPdfUrl     String        // Can be updated by editor
+  // File Management - Store both PDF and Word versions
+  originalPdfUrl    String        // Original PDF (or converted from Word)
+  currentPdfUrl     String        // Current PDF (can be updated by editor)
+  originalWordUrl   String?       // Original Word (or converted from PDF)
+  currentWordUrl    String?       // Current Word (can be updated by editor)
+  originalFileType  String        @default("pdf") // What user originally uploaded: "pdf" or "docx"
+  
+  // Image Management
+  thumbnailUrl      String?       // Article thumbnail/cover image
+  imageUrls         String[]      // Multiple images (for gallery or inline images)
   
   // PDF Content Extraction (for web display)
   content           String?       @db.Text  // Extracted text from PDF
@@ -167,6 +174,7 @@ model ArticleRevision {
   article     Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
   
   pdfUrl      String
+  wordUrl     String?  // Store Word version if editor uploads it
   uploadedBy  String?  // Editor ID if uploaded by editor
   comments    String?  @db.Text
   

@@ -2,6 +2,8 @@ import type { Response } from "express";
 import type { AuthRequest } from "@/types/auth-request.js";
 import { articleService } from "./article.service.js";
 import { BadRequestError } from "@/utils/http-errors.util.js";
+import { addWatermarkToPdf } from "@/utils/pdf-watermark.utils.js";
+import { addSimpleWatermarkToWord } from "@/utils/word-watermark.utils.js";
 import {
   articleSubmissionSchema,
   assignEditorSchema,
@@ -241,14 +243,82 @@ export class ArticleController {
         throw new BadRequestError("Article ID is required");
       }
 
-      const article = await articleService.getArticlePdfUrl(articleId);
+      const userName = req.user?.name || 'Guest User';
+      
+      console.log(`📥 [Download] User "${userName}" requesting PDF for article ${articleId}`);
 
-      res.json({
-        pdfUrl: article.currentPdfUrl,
-        title: article.title,
-        message: "PDF ready for download",
-      });
+      // Get article PDF info
+      const article = await articleService.getArticlePdfUrl(articleId);
+      
+      console.log(`📄 [Download] Article: "${article.title}"`);
+      console.log(`📂 [Download] PDF path: ${article.currentPdfUrl}`);
+
+      // Add watermark to PDF
+      const watermarkedPdf = await addWatermarkToPdf(
+        article.currentPdfUrl,
+        {
+          userName,
+          downloadDate: new Date(),
+          articleTitle: article.title,
+        }
+      );
+
+      // Send watermarked PDF
+      const filename = `${article.title.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', watermarkedPdf.length.toString());
+      
+      console.log(`✅ [Download] Sending watermarked PDF (${watermarkedPdf.length} bytes)`);
+      
+      res.send(watermarkedPdf);
     } catch (error) {
+      console.error('❌ [Download] Failed:', error);
+      throw error;
+    }
+  }
+
+  // Download article Word (protected - auth required, all logged-in users)
+  async downloadArticleWord(req: AuthRequest, res: Response) {
+    try {
+      const articleId = req.params.id;
+      if (!articleId) {
+        throw new BadRequestError("Article ID is required");
+      }
+
+      const userName = req.user?.name || 'User';
+      
+      console.log(`📥 [Download] User "${userName}" requesting Word for article ${articleId}`);
+
+      // Get article Word info
+      const article = await articleService.getArticleWordUrl(articleId);
+      
+      console.log(`📄 [Download] Article: "${article.title}"`);
+      console.log(`📂 [Download] Word path: ${article.currentWordUrl}`);
+
+      // Add watermark to Word document
+      const watermarkedWord = await addSimpleWatermarkToWord(
+        article.currentWordUrl!,
+        {
+          userName,
+          downloadDate: new Date(),
+          articleTitle: article.title,
+        }
+      );
+
+      // Send watermarked Word file
+      const filename = `${article.title.replace(/[^a-z0-9]/gi, '_')}.docx`;
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', watermarkedWord.length.toString());
+      
+      console.log(`✅ [Download] Sending watermarked Word file (${watermarkedWord.length} bytes)`);
+      
+      res.send(watermarkedWord);
+    } catch (error) {
+      console.error('❌ [Download] Failed:', error);
       throw error;
     }
   }
@@ -269,7 +339,7 @@ export class ArticleController {
     }
   }
 
-  // Get article content for reading (public endpoint)
+  // Get article content for reading (public endpoint with optional auth)
   async getArticleContent(req: AuthRequest, res: Response) {
     try {
       const articleId = req.params.id;
@@ -277,12 +347,25 @@ export class ArticleController {
         throw new BadRequestError("Article ID is required");
       }
 
-      const article = await articleService.getArticleContent(articleId);
+      // Check if user is authenticated
+      const isAuthenticated = !!req.user;
 
-      res.json({
-        message: "Article content retrieved successfully",
-        article,
-      });
+      const article = await articleService.getArticleContent(articleId, isAuthenticated);
+
+      // Different messages based on auth status
+      if (!isAuthenticated && article.isLimited) {
+        res.json({
+          message: "Preview mode: Login to read the full article and download PDF",
+          article,
+          requiresLogin: true,
+        });
+      } else {
+        res.json({
+          message: "Article content retrieved successfully",
+          article,
+          requiresLogin: false,
+        });
+      }
     } catch (error) {
       throw error;
     }
@@ -307,10 +390,24 @@ export class ArticleController {
     }
   }
 
-  // Search articles (public endpoint)
+  // Search articles (public endpoint with enhanced filters)
   async searchArticles(req: AuthRequest, res: Response) {
     try {
-      const { q, category, page, limit } = req.query;
+      const { 
+        q, 
+        category, 
+        author, 
+        organization, 
+        keyword,
+        dateFrom,
+        dateTo,
+        sortBy,
+        sortOrder,
+        minScore,
+        exclude,
+        page, 
+        limit 
+      } = req.query;
 
       if (!q || typeof q !== "string") {
         throw new BadRequestError("Search query 'q' is required");
@@ -318,6 +415,15 @@ export class ArticleController {
 
       const filters: {
         category?: string;
+        author?: string;
+        organization?: string;
+        keyword?: string;
+        dateFrom?: string;
+        dateTo?: string;
+        sortBy?: 'relevance' | 'date' | 'title' | 'author';
+        sortOrder?: 'asc' | 'desc';
+        minScore?: number;
+        exclude?: string;
         page?: number;
         limit?: number;
       } = {
@@ -325,9 +431,36 @@ export class ArticleController {
         limit: limit ? parseInt(limit as string) : 20,
       };
 
-      // Only add category if it exists
+      // Add optional filters
       if (category && typeof category === "string") {
         filters.category = category;
+      }
+      if (author && typeof author === "string") {
+        filters.author = author;
+      }
+      if (organization && typeof organization === "string") {
+        filters.organization = organization;
+      }
+      if (keyword && typeof keyword === "string") {
+        filters.keyword = keyword;
+      }
+      if (dateFrom && typeof dateFrom === "string") {
+        filters.dateFrom = dateFrom;
+      }
+      if (dateTo && typeof dateTo === "string") {
+        filters.dateTo = dateTo;
+      }
+      if (sortBy && typeof sortBy === "string") {
+        filters.sortBy = sortBy as 'relevance' | 'date' | 'title' | 'author';
+      }
+      if (sortOrder && typeof sortOrder === "string") {
+        filters.sortOrder = sortOrder as 'asc' | 'desc';
+      }
+      if (minScore && typeof minScore === "string") {
+        filters.minScore = parseFloat(minScore);
+      }
+      if (exclude && typeof exclude === "string") {
+        filters.exclude = exclude;
       }
 
       const result = await articleService.searchArticles(q, filters);
@@ -335,6 +468,53 @@ export class ArticleController {
       res.json({
         message: "Search completed successfully",
         ...result,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Upload thumbnail for article
+  async uploadThumbnail(req: AuthRequest, res: Response) {
+    try {
+      const articleId = req.params.id;
+      if (!articleId) {
+        throw new BadRequestError("Article ID is required");
+      }
+      
+      if (!req.fileMeta?.url) {
+        throw new BadRequestError("Image file is required");
+      }
+      
+      const article = await articleService.uploadThumbnail(articleId, req.fileMeta.url);
+      
+      res.json({
+        message: "Thumbnail uploaded successfully",
+        article,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Upload multiple images for article
+  async uploadImages(req: AuthRequest, res: Response) {
+    try {
+      const articleId = req.params.id;
+      if (!articleId) {
+        throw new BadRequestError("Article ID is required");
+      }
+      
+      if (!req.fileUrls || req.fileUrls.length === 0) {
+        throw new BadRequestError("Image files are required");
+      }
+      
+      const imageUrls = req.fileUrls.map(f => f.url);
+      const article = await articleService.uploadImages(articleId, imageUrls);
+      
+      res.json({
+        message: `${imageUrls.length} images uploaded successfully`,
+        article,
       });
     } catch (error) {
       throw error;
