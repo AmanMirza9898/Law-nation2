@@ -151,7 +151,7 @@ export default function Navbar() {
                     href="/join-us" 
                     className="px-5 py-2.5 text-sm font-semibold text-white bg-red-600 rounded-full shadow-md hover:bg-red-700 hover:shadow-lg transition-all transform hover:-translate-y-0.5"
                   >
-                    Get Started
+                    Join Us
                   </Link>
                 </div>
               )}

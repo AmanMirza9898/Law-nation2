@@ -15,6 +15,7 @@ export default function SubmitPaperPage() {
   const initialFormState = {
     fullName: "",
     email: "",
+    declarationAccepted: false,
     phone: "",
     articleTitle: "",
     authorImage: null,
@@ -50,11 +51,13 @@ export default function SubmitPaperPage() {
     { number: 3, title: "Submit Your Article" }
   ]
 
+ // Purana 'handleInputChange' hatao aur ye wala lagao
   const handleInputChange = (e) => {
-    const { name, value, files } = e.target
+    const { name, value, files, type, checked } = e.target
     setFormData(prev => ({
       ...prev,
-      [name]: files ? files[0] : value
+      // Agar checkbox hai to 'checked' lenge, file hai to 'files', warna normal 'value'
+      [name]: type === "checkbox" ? checked : (files ? files[0] : value)
     }))
   }
 
@@ -116,6 +119,19 @@ export default function SubmitPaperPage() {
       toast.error("Please select a content format and upload a PDF file.")
       return
     }
+
+    // Validation
+    if (!formData.file || !formData.contentFormat) {
+      toast.error("Please select a content format and upload a PDF file.")
+      return
+    }
+
+    // --- YE CODE ADD KARO ---
+    if (!formData.declarationAccepted) {
+      toast.error("Please agree to the declaration to submit.")
+      return
+    }
+    // ------------------------
 
     setIsLoading(true)
     setStatus({ type: "", message: "" })
@@ -428,7 +444,7 @@ export default function SubmitPaperPage() {
                   <div>
                     <div className="flex items-center justify-between mb-1.5 sm:mb-2">
                       <label htmlFor="detailedDescription" className="block text-xs sm:text-sm font-medium text-gray-700">Detailed Description</label>
-                      <span className="text-xs sm:text-sm text-gray-500">{formData.detailedDescription.length}/1500 characters</span>
+                      <span className="text-xs sm:text-sm text-gray-500">50/100 characters</span>
                     </div>
                     <textarea
                       id="detailedDescription"
@@ -461,7 +477,7 @@ export default function SubmitPaperPage() {
                         type="button"
                         onClick={handleAddKeyword}
                         disabled={!keywordInput.trim() || formData.keywords.length >= 5}
-                        className="px-4 sm:px-6 py-2 sm:py-3 bg-red-600 text-white rounded-md text-sm sm:text-base font-medium hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        className="px-4 sm:px-6 py-2 sm:py-3 bg-red-600 text-white rounded-md text-sm sm:text-base font-medium hover:bg-red-700 transition-colors"
                       >
                         Add
                       </button>
@@ -554,7 +570,7 @@ export default function SubmitPaperPage() {
                   </div>
 
                   <div>
-                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Content Format</h3>
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Submission type</h3>
                     <select
                       id="contentFormat"
                       name="contentFormat"
@@ -572,6 +588,28 @@ export default function SubmitPaperPage() {
                       <option value="other">Other</option>
                     </select>
                   </div>
+
+
+                  {/* --- YAHAN PASTE KARO (Ye naya code hai) --- */}
+                <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="declarationAccepted"
+                      checked={formData.declarationAccepted}
+                      onChange={handleInputChange}
+                      className="mt-1 w-5 h-5 text-red-600 rounded border-gray-300 focus:ring-red-600 flex-shrink-0"
+                    />
+                    <span className="text-xs sm:text-sm text-gray-700 text-justify leading-relaxed">
+                      I/We declare that the manuscript is an original and previously unpublished work written by me/us. 
+                      I/We shall be solely responsible for any dispute arising out of my/our manuscript, including issues 
+                      related to copyright, defamation, objectionable content, or contempt, and agree to bear any loss or 
+                      liability caused by violation of copyright or any other rights. Upon submission and acceptance for 
+                      publication, the manuscript shall become the property of <strong>Law Nation Prime Times Journal</strong>.
+                    </span>
+                  </label>
+                </div>
+                {/* ------------------------------------------- */}
                 </div>
               )}
 

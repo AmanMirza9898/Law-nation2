@@ -1,11 +1,10 @@
 "use client"
 import React, { useState, ChangeEvent, FormEvent } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-// ✅ Sirf 'toast' import karna hai, Container aur CSS nahi (wo Layout mein hai)
+// ✅ Change 1: useSearchParams yahan import kiya
+import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from 'react-toastify';
 
-// ✅ Redux Integration
 import { useDispatch } from "react-redux";
 import { setCredentials } from "../../lib/store/authSlice"; 
 
@@ -13,6 +12,10 @@ export default function Login() {
   const router = useRouter()
   const dispatch = useDispatch()
   
+  // ✅ Change 2: Ye lines Component ke ANDAR honi chahiye
+  const searchParams = useSearchParams();
+  const redirectPath = searchParams.get('redirect');
+
   const [formData, setFormData] = useState({
     email: "",
     password: ""
@@ -21,13 +24,11 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
-  // ✅ Fix 1: TypeScript Type added for Input Change
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  // ✅ Fix 2: TypeScript Type added for Form Submit
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
@@ -46,10 +47,7 @@ export default function Login() {
         const user = data.user || { name: data.name, email: data.email };
 
         if (token) {
-          // ✅ Redux store mein data save
           dispatch(setCredentials({ user, token }));
-
-          // ✅ LocalStorage mein backup
           localStorage.setItem("authToken", token);
           localStorage.setItem("userName", user.name);
         }
@@ -58,8 +56,13 @@ export default function Login() {
           toastId: "login-success"
         });
 
+        // ✅ Change 3: Logic Update - Redirect check
         setTimeout(() => {
-          router.push("/home"); 
+          if (redirectPath) {
+             router.push(redirectPath); // Article par wapas bhejo
+          } else {
+             router.push("/home"); // Normal Home page bhejo
+          }
         }, 1500)
 
       } else {
@@ -80,9 +83,7 @@ export default function Login() {
   return (
     <div className="h-screen flex overflow-hidden">
       
-      {/* ❌ Yahan se <ToastContainer /> HATA DIYA hai */}
-
-      {/* Left Side - Original Gradient Design */}
+      {/* Left Side */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-red-800 relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-full h-full" style={{
@@ -102,7 +103,7 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Right Side - Original Form Design */}
+      {/* Right Side */}
       <div className="w-full lg:w-1/2 flex items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-10 xl:px-12 py-6 overflow-y-auto">
         <div className="w-full max-w-md">
           <div className="lg:hidden text-center mb-6">

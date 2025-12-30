@@ -377,12 +377,12 @@ export default function EditorDashboard() {
                       </div>
                     </div>
 
-                    <button 
+                    {/* <button 
                       onClick={() => handleArticleAction(selectedArticle._id || selectedArticle.id, "approve")}
                       className="w-full py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow-md transition"
                     >
                       ✅ Approve & Publish
-                    </button>
+                    </button> */}
                     
                   </div>
                 </div>

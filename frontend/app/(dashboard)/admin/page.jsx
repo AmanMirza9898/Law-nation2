@@ -382,14 +382,14 @@ export default function AdminDashboard() {
         </header>
 
         {/* CONTENT */}
-        <div className="p-4 md:p-10 space-y-6 md:space-y-10 flex-1">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <div className="p-4 md:p-10 space-y-6 md:space-y-10 flex-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             <StatCard title="Total Submissions" count={articles.length} />
             <StatCard
               title="Awaiting"
               count={articles.filter((a) => a.status === "Pending").length}
             />
-            <StatCard title="Editors" count={editors.length} />
+            
             <StatCard
               title="Published"
               count={articles.filter((a) => a.status === "Published").length}
@@ -525,7 +525,8 @@ export default function AdminDashboard() {
                 >
                   <option value="All">All Status</option>
                   <option value="Pending">Pending</option>
-                  <option value="In Review">In Review</option>
+                  <option value="In Review">Under Review</option>
+                  <option value="In Review">Reviewed </option>
                   <option value="Published">Published</option>
                 </select>
               </div>
