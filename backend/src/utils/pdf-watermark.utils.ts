@@ -63,17 +63,18 @@ export async function addWatermarkToPdf(
     const watermarkText = `Downloaded from LAW NATION on ${dateStr}`;
     const articleUrl = `${options.frontendUrl}/articles/${options.articleId}`;
     const linkText = `View online: ${articleUrl}`;
+    const noteText = `(Login may be required)`;  // ✅ FIX 1: Add login note
     
     console.log('🔖 [Watermark] Watermark text:', watermarkText);
     console.log('🔗 [Watermark] Article link:', articleUrl);
     
-    // 4. Add watermark to each page
+    // 4. Add watermark to each page, link only on first page
     console.log('✍️ [Watermark] Adding watermark to all pages...');
     
-    pages.forEach((page) => {
+    pages.forEach((page, index) => {
       const { width, height } = page.getSize();
       
-      // Top-right watermark (LAW NATION logo)
+      // Top-right watermark (LAW NATION logo) - on ALL pages
       page.drawText('LAW NATION', {
         x: width - 120,
         y: height - 30,
@@ -82,7 +83,7 @@ export async function addWatermarkToPdf(
         opacity: 0.5,
       });
       
-      // Bottom-left watermark - Download info
+      // Bottom-left watermark - Download info - on ALL pages
       page.drawText(watermarkText, {
         x: 50,
         y: 45,
@@ -91,35 +92,63 @@ export async function addWatermarkToPdf(
         opacity: 0.7,
       });
       
-      // Bottom-left watermark - Clickable link
-      page.drawText(linkText, {
-        x: 50,
-        y: 30,
-        size: 9,
-        color: rgb(0, 0, 0.8),  // Blue color for link
-      });
-      
-      // Add clickable link annotation
-      const linkWidth = linkText.length * 5.5;  // Approximate width
-      const linkAnnotation = pdfDoc.context.obj({
-        Type: 'Annot',
-        Subtype: 'Link',
-        Rect: [50, 28, Math.min(50 + linkWidth, width - 50), 42],
-        Border: [0, 0, 0],
-        C: [0, 0, 1],
-        A: {
-          S: 'URI',
-          URI: PDFString.of(articleUrl),
-        },
-      });
-      
-      const linkAnnotationRef = pdfDoc.context.register(linkAnnotation);
-      
-      // Set annotations array (replace existing or create new)
-      page.node.set(PDFName.of('Annots'), pdfDoc.context.obj([linkAnnotationRef]));
+      // ✅ FIX 2: Add clickable link ONLY on FIRST page
+      if (index === 0) {
+        // Clickable link text
+        page.drawText(linkText, {
+          x: 50,
+          y: 30,
+          size: 9,
+          color: rgb(0, 0, 0.8),  // Blue color for link
+        });
+        
+        // ✅ FIX 1: Add note about login requirement
+        page.drawText(noteText, {
+          x: 50,
+          y: 15,
+          size: 7,
+          color: rgb(0.5, 0.5, 0.5),  // Gray color
+        });
+        
+        // Add clickable link annotation
+        const linkWidth = linkText.length * 5.5;  // Approximate width
+        const linkAnnotation = pdfDoc.context.obj({
+          Type: 'Annot',
+          Subtype: 'Link',
+          Rect: [50, 28, Math.min(50 + linkWidth, width - 50), 42],
+          Border: [0, 0, 0],
+          C: [0, 0, 1],
+          A: {
+            S: 'URI',
+            URI: PDFString.of(articleUrl),
+          },
+        });
+        
+        const linkAnnotationRef = pdfDoc.context.register(linkAnnotation);
+        
+        // ✅ FIX 3: Preserve existing annotations instead of overwriting
+        const existingAnnots = page.node.get(PDFName.of('Annots'));
+        
+        let annotsArray: any[];
+        if (existingAnnots && existingAnnots instanceof Array) {
+          // PDF already has annotations - add our link to them
+          annotsArray = [...existingAnnots, linkAnnotationRef];
+          console.log(`📎 [Watermark] Preserved ${existingAnnots.length} existing annotations on page 1`);
+        } else if (existingAnnots) {
+          // Existing annotations exist but not as array - keep them and add ours
+          annotsArray = [existingAnnots, linkAnnotationRef];
+          console.log(`📎 [Watermark] Preserved 1 existing annotation on page 1`);
+        } else {
+          // PDF has no annotations - create new array
+          annotsArray = [linkAnnotationRef];
+        }
+        
+        page.node.set(PDFName.of('Annots'), pdfDoc.context.obj(annotsArray));
+      }
     });
     
     console.log(`✅ [Watermark] Watermark added to ${pages.length} pages`);
+    console.log(`✅ [Watermark] Clickable link added to first page only`);
     
     // 5. Save watermarked PDF
     console.log('💾 [Watermark] Saving watermarked PDF...');

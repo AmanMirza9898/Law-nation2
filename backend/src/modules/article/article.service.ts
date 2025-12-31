@@ -646,25 +646,12 @@ export class ArticleService {
       },
     });
 
-    // Send correction notification to primary author
-    sendArticleCorrectionNotification(
-      article.authorEmail,
-      article.authorName,
-      article.title,
-      article.id,
-      data.comments
-    );
-
-    // Send correction notification to second author if exists
-    if (article.secondAuthorEmail && article.secondAuthorName) {
-      sendArticleCorrectionNotification(
-        article.secondAuthorEmail,
-        article.secondAuthorName,
-        article.title,
-        article.id,
-        data.comments
-      );
-    }
+    // ✅ REMOVED: Don't send correction emails during editing
+    // Author will receive ONE final email when article is published
+    // with link to view complete change history (final diff only)
+    
+    console.log(`📝 [Editor Upload] Version ${versionNumber} uploaded. No email sent to author.`);
+    console.log(`📊 [Diff Summary] ${diffSummary}`);
 
     return {
       article: updatedArticle,
@@ -1316,6 +1303,34 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
       );
     }
 
+    // ✅ Calculate FINAL diff (original vs current) for author notification
+    let finalDiffSummary = "No changes made";
+    let finalDiffData = null;
+    
+    if (article.originalPdfUrl !== article.currentPdfUrl) {
+      try {
+        console.log(`📊 [Final Diff] Calculating original vs final for author...`);
+        console.log(`   Original: ${article.originalPdfUrl}`);
+        console.log(`   Final: ${article.currentPdfUrl}`);
+        
+        const finalDiff = await calculateFileDiff(
+          article.originalPdfUrl,  // Original submission
+          article.currentPdfUrl    // Final published version
+        );
+        
+        finalDiffData = finalDiff;
+        finalDiffSummary = generateDiffSummary(finalDiff);
+        
+        console.log(`✅ [Final Diff] ${finalDiffSummary}`);
+      } catch (error) {
+        console.error("❌ [Final Diff] Failed to calculate:", error);
+        // Continue with generic message if diff calculation fails
+        finalDiffSummary = "Changes were made during review";
+      }
+    } else {
+      console.log(`ℹ️ [Final Diff] No changes - original and current are the same`);
+    }
+
     // Update article status to PUBLISHED
     const updatedArticle = await prisma.article.update({
       where: { id: articleId },
@@ -1336,50 +1351,23 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
       },
     });
 
-    // ✅ Get final diff summary
-    const changeLogs = await prisma.articleChangeLog.findMany({
-      where: { articleId },
-      orderBy: { versionNumber: "asc" },
-    });
-
-    let finalDiffSummary = "No changes made";
-    if (changeLogs.length > 0) {
-      const totalAdded = changeLogs.reduce((sum, log) => {
-        const diffData = log.diffData as any;
-        return sum + (diffData.summary?.totalAdded || 0);
-      }, 0);
-      const totalRemoved = changeLogs.reduce((sum, log) => {
-        const diffData = log.diffData as any;
-        return sum + (diffData.summary?.totalRemoved || 0);
-      }, 0);
-      const totalModified = changeLogs.reduce((sum, log) => {
-        const diffData = log.diffData as any;
-        return sum + (diffData.summary?.totalModified || 0);
-      }, 0);
-
-      const parts: string[] = [];
-      if (totalAdded > 0) parts.push(`${totalAdded} lines added`);
-      if (totalRemoved > 0) parts.push(`${totalRemoved} lines removed`);
-      if (totalModified > 0) parts.push(`${totalModified} lines modified`);
-      
-      finalDiffSummary = parts.length > 0 ? parts.join(", ") : "Minor changes";
-    }
-
-    // ✅ Notify original uploader (in-app + email with link to change history)
+    // ✅ Notify original uploader with FINAL diff summary
     await notifyUploaderOfPublication(
       articleId,
       article.title,
       article.authorEmail,
-      article.authorName
+      article.authorName,
+      finalDiffSummary  // Pass final diff summary
     );
 
-    // ✅ Notify second author if exists (in-app + email)
+    // ✅ Notify second author if exists
     if (article.secondAuthorEmail && article.secondAuthorName) {
       await notifyUploaderOfPublication(
         articleId,
         article.title,
         article.secondAuthorEmail,
-        article.secondAuthorName
+        article.secondAuthorName,
+        finalDiffSummary  // Pass final diff summary
       );
     }
 
@@ -1402,6 +1390,8 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
         assignedEditorId: true,
         authorEmail: true,
         secondAuthorEmail: true,
+        originalPdfUrl: true,
+        currentPdfUrl: true,
       },
     });
 
@@ -1444,36 +1434,58 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
       },
     });
 
-    // If uploader (non-admin, non-editor), only show final diff
+    // If uploader (non-admin, non-editor), calculate and show FINAL diff only
     if (isUploader && !isAdmin && !isAssignedEditor) {
-      // Calculate combined final diff
-      const totalAdded = changeLogs.reduce((sum, log) => {
-        const diffData = log.diffData as any;
-        return sum + (diffData.summary?.totalAdded || 0);
-      }, 0);
-      const totalRemoved = changeLogs.reduce((sum, log) => {
-        const diffData = log.diffData as any;
-        return sum + (diffData.summary?.totalRemoved || 0);
-      }, 0);
-      const totalModified = changeLogs.reduce((sum, log) => {
-        const diffData = log.diffData as any;
-        return sum + (diffData.summary?.totalModified || 0);
-      }, 0);
+      try {
+        console.log(`📊 [Author View] Calculating final diff (original vs current)...`);
+        
+        // Calculate actual diff between original and current
+        const finalDiff = await calculateFileDiff(
+          article.originalPdfUrl,
+          article.currentPdfUrl
+        );
+        
+        const finalDiffSummary = generateDiffSummary(finalDiff);
+        console.log(`✅ [Author View] ${finalDiffSummary}`);
 
-      return {
-        article: {
-          id: article.id,
-          title: article.title,
-          status: article.status,
-        },
-        finalDiff: {
-          totalAdded,
-          totalRemoved,
-          totalModified,
-          summary: `${totalAdded} lines added, ${totalRemoved} lines removed, ${totalModified} lines modified`,
-        },
-        accessLevel: "uploader",
-      };
+        return {
+          article: {
+            id: article.id,
+            title: article.title,
+            status: article.status,
+            originalPdfUrl: article.originalPdfUrl,
+            currentPdfUrl: article.currentPdfUrl,
+          },
+          finalDiff: {
+            totalAdded: finalDiff.summary.totalAdded,
+            totalRemoved: finalDiff.summary.totalRemoved,
+            totalModified: finalDiff.summary.totalModified,
+            summary: finalDiffSummary,
+            diffData: finalDiff,  // Include full diff data for detailed view
+          },
+          accessLevel: "uploader",
+        };
+      } catch (error) {
+        console.error("❌ [Author View] Failed to calculate final diff:", error);
+        
+        // Fallback: return summary without detailed diff
+        return {
+          article: {
+            id: article.id,
+            title: article.title,
+            status: article.status,
+            originalPdfUrl: article.originalPdfUrl,
+            currentPdfUrl: article.currentPdfUrl,
+          },
+          finalDiff: {
+            totalAdded: 0,
+            totalRemoved: 0,
+            totalModified: 0,
+            summary: "Changes were made during review",
+          },
+          accessLevel: "uploader",
+        };
+      }
     }
 
     // Admin or assigned editor - show full history
@@ -1482,6 +1494,8 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
         id: article.id,
         title: article.title,
         status: article.status,
+        originalPdfUrl: article.originalPdfUrl,
+        currentPdfUrl: article.currentPdfUrl,
       },
       changeLogs: changeLogs.map((log) => ({
         id: log.id,
