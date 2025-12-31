@@ -32,11 +32,61 @@ export interface DiffResult {
  */
 async function extractTextFromPdf(filePath: string): Promise<string> {
   try {
-    const dataBuffer = await fs.readFile(filePath);
-    const data = await PDFParse(dataBuffer);
-    return data.text || "";
+    console.log(`📄 [Diff-PDF] Extracting text from: ${filePath}`);
+    
+    let dataBuffer: Buffer;
+    
+    // Check if it's a URL (Supabase or remote storage)
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+      console.log(`🌐 [Diff-PDF] Downloading from URL...`);
+      const response = await fetch(filePath);
+      if (!response.ok) {
+        throw new Error(`Failed to download PDF: ${response.statusText}`);
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      dataBuffer = Buffer.from(arrayBuffer);
+      console.log(`✅ [Diff-PDF] Downloaded ${dataBuffer.length} bytes`);
+    } else {
+      // Handle local file path
+      let absolutePath = filePath;
+      
+      // Convert relative path to absolute
+      if (filePath.startsWith('/uploads')) {
+        absolutePath = path.join(process.cwd(), filePath);
+        console.log(`🔄 [Diff-PDF] Converted to absolute path: ${absolutePath}`);
+      }
+      
+      console.log(`💾 [Diff-PDF] Reading local file...`);
+      dataBuffer = await fs.readFile(absolutePath);
+      console.log(`✅ [Diff-PDF] Read ${dataBuffer.length} bytes`);
+    }
+    
+    // ✅ FIX: Use correct PDFParse API (class-based, same as pdf-extract.utils.ts)
+    console.log(`⚙️ [Diff-PDF] Creating PDFParse instance...`);
+    const parser = new PDFParse({ data: dataBuffer });
+    
+    console.log(`📖 [Diff-PDF] Extracting text...`);
+    const result = await parser.getText();
+    
+    console.log(`🧹 [Diff-PDF] Cleaning up parser...`);
+    await parser.destroy();
+    
+    const text = result.text || "";
+    console.log(`✅ [Diff-PDF] Extracted ${text.length} characters`);
+    
+    if (text.trim().length === 0) {
+      console.warn(`⚠️ [Diff-PDF] WARNING: No text extracted from PDF`);
+      console.warn(`   This might mean:`);
+      console.warn(`   - PDF is scanned (image-based)`);
+      console.warn(`   - PDF is encrypted/protected`);
+      console.warn(`   - PDF is corrupted`);
+    }
+    
+    return text;
   } catch (error) {
-    console.error("Error extracting text from PDF:", error);
+    console.error("❌ [Diff-PDF] Error extracting text from PDF:", error);
+    console.error("❌ [Diff-PDF] File path:", filePath);
+    console.error("❌ [Diff-PDF] Error details:", error instanceof Error ? error.message : String(error));
     throw new Error("Failed to extract text from PDF");
   }
 }
@@ -46,10 +96,54 @@ async function extractTextFromPdf(filePath: string): Promise<string> {
  */
 async function extractTextFromWord(filePath: string): Promise<string> {
   try {
-    const result = await mammoth.extractRawText({ path: filePath });
-    return result.value;
+    console.log(`📄 [Diff-Word] Extracting text from: ${filePath}`);
+    
+    let absolutePath = filePath;
+    
+    // Handle URLs (download first)
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+      console.log(`🌐 [Diff-Word] Downloading from URL...`);
+      const response = await fetch(filePath);
+      if (!response.ok) {
+        throw new Error(`Failed to download Word file: ${response.statusText}`);
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      
+      // Save to temp file for mammoth
+      const tempPath = path.join(process.cwd(), 'uploads', 'temp', `temp-${Date.now()}.docx`);
+      await fs.writeFile(tempPath, buffer);
+      absolutePath = tempPath;
+      console.log(`✅ [Diff-Word] Downloaded to temp: ${tempPath}`);
+    } else {
+      // Convert relative path to absolute
+      if (filePath.startsWith('/uploads')) {
+        absolutePath = path.join(process.cwd(), filePath);
+        console.log(`🔄 [Diff-Word] Converted to absolute path: ${absolutePath}`);
+      }
+    }
+    
+    console.log(`📖 [Diff-Word] Extracting text with mammoth...`);
+    const result = await mammoth.extractRawText({ path: absolutePath });
+    
+    const text = result.value;
+    console.log(`✅ [Diff-Word] Extracted ${text.length} characters`);
+    
+    // Clean up temp file if it was downloaded
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+      try {
+        await fs.unlink(absolutePath);
+        console.log(`🧹 [Diff-Word] Cleaned up temp file`);
+      } catch (e) {
+        console.warn(`⚠️ [Diff-Word] Could not delete temp file: ${absolutePath}`);
+      }
+    }
+    
+    return text;
   } catch (error) {
-    console.error("Error extracting text from Word:", error);
+    console.error("❌ [Diff-Word] Error extracting text from Word:", error);
+    console.error("❌ [Diff-Word] File path:", filePath);
+    console.error("❌ [Diff-Word] Error details:", error instanceof Error ? error.message : String(error));
     throw new Error("Failed to extract text from Word");
   }
 }

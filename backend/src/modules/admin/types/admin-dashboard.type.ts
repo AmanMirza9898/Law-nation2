@@ -32,6 +32,10 @@ export interface ArticleTimeline {
   title: string;
   status: string;
   authorName: string;
+  abstract?: string;
+  assignedEditorId?: string | null;
+  originalPdfUrl?: string;
+  currentPdfUrl?: string;
   timeline: {
     submittedAt: Date;
     assignedAt: Date | null;

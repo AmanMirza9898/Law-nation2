@@ -216,6 +216,10 @@ class AdminDashboardService {
             title: true,
             status: true,
             authorName: true,
+            abstract: true,
+            assignedEditorId: true,
+            originalPdfUrl: true,
+            currentPdfUrl: true,
             submittedAt: true,
             reviewedAt: true,
             approvedAt: true,
@@ -234,6 +238,10 @@ class AdminDashboardService {
         title: article.title,
         status: article.status,
         authorName: article.authorName,
+        abstract: article.abstract,
+        assignedEditorId: article.assignedEditorId,
+        originalPdfUrl: article.originalPdfUrl,
+        currentPdfUrl: article.currentPdfUrl,
         timeline: {
           submittedAt: article.submittedAt,
           assignedAt: article.createdAt, // Using createdAt as proxy

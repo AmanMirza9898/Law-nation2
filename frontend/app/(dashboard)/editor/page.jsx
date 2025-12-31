@@ -3,6 +3,48 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 
+// ... existing imports ...
+
+// ✅ NEW: Diff Viewer Component (Isse existing icons ke neeche paste kar do)
+const DiffViewer = ({ diffData }) => {
+  if (!diffData || !diffData.summary) return <p className="text-xs text-gray-400 italic">No diff data available.</p>;
+
+  return (
+    <div className="mt-3 bg-gray-50 rounded border border-gray-200 text-xs font-mono overflow-hidden">
+      {/* Summary Header */}
+      <div className="bg-gray-100 p-2 border-b flex gap-2 font-bold uppercase tracking-wider text-[10px]">
+        <span className="text-green-600">+{diffData.summary.totalAdded} Added</span>
+        <span className="text-red-600">-{diffData.summary.totalRemoved} Removed</span>
+        <span className="text-blue-600">~{diffData.summary.totalModified} Modified</span>
+      </div>
+      
+      {/* Scrollable Diff Body */}
+      <div className="max-h-48 overflow-y-auto p-1 space-y-0.5">
+        {diffData.removed?.map((line, i) => (
+          <div key={`rem-${i}`} className="flex bg-red-50 text-red-700">
+            <span className="w-6 text-gray-400 border-r border-red-200 mr-2 text-right pr-1 select-none">{line.oldLineNumber}</span>
+            <span className="line-through decoration-red-300 opacity-75">- {line.content}</span>
+          </div>
+        ))}
+        {diffData.added?.map((line, i) => (
+          <div key={`add-${i}`} className="flex bg-green-50 text-green-700">
+            <span className="w-6 text-gray-400 border-r border-green-200 mr-2 text-right pr-1 select-none">{line.newLineNumber}</span>
+            <span>+ {line.content}</span>
+          </div>
+        ))}
+        {diffData.modified?.map((line, i) => (
+          <div key={`mod-${i}`} className="flex bg-blue-50 text-blue-700">
+             <span className="w-6 text-gray-400 border-r border-blue-200 mr-2 text-right pr-1 select-none">{line.newLineNumber}</span>
+            <span>~ {line.content}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ... existing helper components ...
+
 // --- YAHAN PASTE KARO (ICONS) ---
 const DownloadIcon = () => (
   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -12,6 +54,13 @@ const DownloadIcon = () => (
 const WordIcon = () => (
   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
+
+// ✅ Icons wale section mein ise add karo
+const CheckCircleIcon = () => (
+  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
 );
 // --------------------------------
@@ -31,15 +80,20 @@ const EditorStatCard = ({ title, count, color }) => (
 export default function EditorDashboard() {
   const router = useRouter();
 
-  const [isAuthorized, setIsAuthorized] = useState(false);
+ const [isAuthorized, setIsAuthorized] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [activeTab, setActiveTab] = useState("tasks");
   const [pdfViewMode, setPdfViewMode] = useState("original");
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // New State for Mobile Menu
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [articles, setArticles] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [uploadedFile, setUploadedFile] = useState(null);
+  const [isLoading, setIsLoading] = useState(true); 
+  const [uploadedFile, setUploadedFile] = useState(null); // SIRF EK BAAR
+  const [changeHistory, setChangeHistory] = useState([]); 
+  const [uploadComment, setUploadComment] = useState(""); 
+  const [isUploading, setIsUploading] = useState(false);
+
+
   // 📊 Chart Data Calculations
   const totalTasks = articles.length || 0;
   const completedTasks = articles.filter(a => a.status === "Published").length || 0;
@@ -107,42 +161,101 @@ export default function EditorDashboard() {
     }
   };
 
-  const handleArticleAction = async (articleId, actionType) => {
+
+  // ... existing fetchAssignedArticles function ...
+
+  // ✅ NEW FUNCTION: Change History Fetch karne ke liye
+  const fetchChangeHistory = async (articleId) => {
     try {
       const token = localStorage.getItem("editorToken");
-      const endpoint = actionType === "approve" ? "approve" : "reject";
-
-      let requestOptions = {
-        method: "PATCH",
+      const res = await fetch(`${API_BASE_URL}/api/articles/${articleId}/change-history`, {
         headers: { Authorization: `Bearer ${token}` },
-      };
-
-      if (actionType === "approve" && uploadedFile) {
-        const formData = new FormData();
-        formData.append("pdf", uploadedFile);
-        requestOptions.body = formData;
-      } else {
-        requestOptions.headers["Content-Type"] = "application/json";
-        requestOptions.body = JSON.stringify({});
-      }
-
-      const res = await fetch(
-        `${API_BASE_URL}/api/articles/${articleId}/${endpoint}`,
-        requestOptions
-      );
-
+      });
       if (res.ok) {
-        toast.success(actionType === "approve" ? "Article Published!" : "Article Rejected");
-        setSelectedArticle(null);
-        setUploadedFile(null);
-        fetchAssignedArticles(profile.id || profile._id, token);
-      } else {
-        const errorData = await res.json();
-        toast.error(errorData.message || "Action failed");
+        const data = await res.json();
+        setChangeHistory(data.changeLogs || []);
       }
     } catch (err) {
-      console.error(err);
-      toast.error("Server error");
+      console.error("Failed to fetch history", err);
+    }
+  };
+
+  // ✅ USE EFFECT: Jab selectedArticle change ho, tab history lao
+  useEffect(() => {
+    if (selectedArticle) {
+      fetchChangeHistory(selectedArticle.id || selectedArticle._id);
+    }
+  }, [selectedArticle]);
+
+  // ❌ DELETE OLD: handleArticleAction function hata do.
+
+  // ✅ NEW 1: Handle Upload Corrected Version (Comment ke saath)
+  const handleUploadCorrection = async () => {
+    if (!uploadedFile) return toast.error("Please select a file first");
+    
+    try {
+      setIsUploading(true);
+      const token = localStorage.getItem("editorToken");
+      const formData = new FormData();
+      
+      // ✅ FIX: Backend 'uploadDocument' middleware expect kar raha hai "document" field
+      formData.append("document", uploadedFile); 
+      
+      if (uploadComment) formData.append("comments", uploadComment);
+
+      const res = await fetch(
+        `${API_BASE_URL}/api/articles/${selectedArticle.id || selectedArticle._id}/upload-corrected`,
+        {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        }
+      );
+
+      const data = await res.json();
+      if (res.ok) {
+        toast.success("New version uploaded & Diff generated!");
+        setUploadedFile(null);
+        setUploadComment("");
+        fetchChangeHistory(selectedArticle.id || selectedArticle._id);
+        
+        if (data.article && data.article.currentPdfUrl) {
+            setSelectedArticle(prev => ({ ...prev, ...data.article }));
+            setPdfViewMode("current"); 
+        }
+      } else {
+        // Agar ab bhi error aaye, toh data.error check karein
+        toast.error(data.error || data.message || "Upload failed");
+      }
+    } catch (err) {
+      toast.error("Server Error");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // ✅ NEW 2: Handle Editor Approval
+  const handleEditorApprove = async () => {
+    try {
+      const token = localStorage.getItem("editorToken");
+      const res = await fetch(
+        `${API_BASE_URL}/api/articles/${selectedArticle.id || selectedArticle._id}/editor-approve`,
+        {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      
+      const data = await res.json();
+      if (res.ok) {
+        toast.success("Approved! Sent to Admin.");
+        setSelectedArticle(null); // Close view
+        fetchAssignedArticles(profile.id, token); // Refresh list
+      } else {
+        toast.error(data.message || "Approval failed");
+      }
+    } catch (err) {
+      toast.error("Something went wrong");
     }
   };
 
@@ -406,70 +519,126 @@ export default function EditorDashboard() {
               </div>
 
               {/* ACTION PANEL (Right Side on Desktop, Bottom on Mobile) */}
-              <div className="w-full lg:w-[350px] space-y-6 shrink-0">
-                <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                  <h3 className="font-bold text-gray-800 mb-4">Action Panel</h3>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Upload Reviewed Version</label>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 transition cursor-pointer relative">
-                        <input type="file" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
-                        {uploadedFile ? (
-                           <p className="text-sm font-bold text-green-600 truncate">{uploadedFile.name}</p>
-                        ) : (
-                           <p className="text-xs text-gray-400">Click to upload PDF</p>
-                        )}
-                      </div>
-                    </div>
+              
+                   {/* ACTION PANEL (Right Side) */}
+<div className="w-full lg:w-[350px] space-y-6 shrink-0 h-full overflow-y-auto pb-10">
+  
+  {/* 1. UPLOAD SECTION */}
+  <div className="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
+    <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+      <span>📤</span> Upload Correction
+    </h3>
+    
+    <div className="space-y-3">
+      {/* File Input */}
+      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 transition cursor-pointer relative bg-gray-50">
+        <input type="file" accept=".pdf,.docx" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+        <div className="pointer-events-none">
+          {uploadedFile ? (
+             <p className="text-sm font-bold text-green-600 truncate px-2">📄 {uploadedFile.name}</p>
+          ) : (
+             <div className="text-gray-400 text-xs">
+                <p className="font-bold text-gray-500">Click to choose file</p>
+                <p>PDF or Word Doc</p>
+             </div>
+          )}
+        </div>
+      </div>
 
-                    {/* <button 
-                      onClick={() => handleArticleAction(selectedArticle._id || selectedArticle.id, "approve")}
-                      className="w-full py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow-md transition"
-                    >
-                      ✅ Approve & Publish
-                    </button> */}
-                    
-                  </div>
-                </div>
+      {/* Comment Input */}
+      <textarea
+        className="w-full p-2 text-sm border rounded bg-gray-50 focus:ring-2 ring-red-200 outline-none resize-none"
+        rows="2"
+        placeholder="Describe changes (e.g. Fixed typos on pg 2)..."
+        value={uploadComment}
+        onChange={(e) => setUploadComment(e.target.value)}
+      />
 
-                {/* --- YAHAN PASTE KARO (BUTTONS BLOCK) --- */}
+      {/* Upload Button */}
+      <button 
+        onClick={handleUploadCorrection}
+        disabled={!uploadedFile || isUploading}
+        className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white
+          ${!uploadedFile ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+      >
+        {isUploading ? "Processing Diff..." : "Upload & Generate Diff"}
+      </button>
+    </div>
+  </div>
+
+  {/* 2. APPROVE BUTTON */}
+  <button 
+    onClick={handleEditorApprove}
+    className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 shadow-lg transition flex items-center justify-center gap-2 transform active:scale-95"
+  >
+    <CheckCircleIcon /> Approve & Notify Admin
+  </button>
+
+  {/* 3. CHANGE HISTORY LIST (Dynamic) */}
+  <div className="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
+    <h3 className="font-bold text-gray-800 mb-4 border-b pb-2">📜 Change History</h3>
+    
+    <div className="space-y-6">
+      {changeHistory.length === 0 ? (
+        <p className="text-sm text-gray-400 text-center py-2">No edits made yet.</p>
+      ) : (
+        changeHistory.map((log, index) => (
+          <div key={log.id} className="relative pl-4 border-l-2 border-gray-200">
+            {/* Timeline Dot */}
+            <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-blue-500 ring-4 ring-white"></div>
+            
+            <div className="mb-1">
+              <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                Version {log.versionNumber}
+              </span>
+              <span className="text-[10px] text-gray-400 ml-2">
+                {new Date(log.editedAt).toLocaleDateString()}
+              </span>
+            </div>
+
+            <p className="text-xs text-gray-600 italic mb-2">
+              "{log.comments || "No comments provided"}"
+            </p>
+
+            {/* Render Diff Viewer Component here */}
+            <DiffViewer diffData={log.diffData} />
+          </div>
+        ))
+      )}
+      
+      {/* Original Submission Marker */}
+      <div className="relative pl-4 border-l-2 border-gray-200 opacity-60">
+        <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-gray-400 ring-4 ring-white"></div>
+        <p className="text-xs font-bold text-gray-500">Original Submission</p>
+      </div>
+    </div>
+  </div>
+
+  {/* 4. SOURCE FILES (Existing buttons moved here) */}
   <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
     <h3 className="font-bold text-gray-800 mb-4">Source Files</h3>
     <div className="flex flex-col gap-3">
-      {/* Word Button */}
       {selectedArticle.originalWordUrl ? (
         <button
           onClick={() => handleDownloadFile(selectedArticle.originalWordUrl, selectedArticle.title, "Word")}
-          className="flex items-center justify-center w-full py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition shadow-sm"
+          className="flex items-center justify-center w-full py-2 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold rounded-lg hover:bg-blue-100 transition"
         >
-          <WordIcon /> Download Word File
+          <WordIcon /> Download Word
         </button>
-      ) : (
-        <div className="text-xs text-gray-400 text-center italic">Word file not available</div>
-      )}
+      ) : <div className="text-xs text-center text-gray-400">No Word file</div>}
 
-      {/* PDF Button */}
       {selectedArticle.originalPdfUrl && (
         <button
           onClick={() => handleDownloadFile(selectedArticle.originalPdfUrl, selectedArticle.title, "PDF")}
-          className="flex items-center justify-center w-full py-2.5 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-black transition shadow-sm"
+          className="flex items-center justify-center w-full py-2 bg-red-50 text-red-700 border border-red-200 text-xs font-bold rounded-lg hover:bg-red-100 transition"
         >
-          <DownloadIcon /> Download Original PDF
+          <DownloadIcon /> Download PDF
         </button>
       )}
     </div>
   </div>
-  {/* ---------------------------------------- */}
 
-                <div className="bg-blue-50 p-6 rounded-xl border border-blue-100">
-                  <h4 className="text-sm font-bold text-blue-800 mb-2">Article Details</h4>
-                  <p className="text-sm text-gray-600 mb-1"><strong>Author:</strong> {selectedArticle.authorName}</p>
-                  <p className="text-sm text-gray-600 mb-1"><strong>Status:</strong> {selectedArticle.status}</p>
-                  <p className="text-xs text-gray-500 mt-2 bg-white p-2 rounded border border-blue-100 italic break-words">"{selectedArticle.abstract}"</p>
-                </div>
-              </div>
-
+</div>
             </div>
           )}
 

@@ -6,6 +6,51 @@ import { useRouter } from "next/navigation";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+// ✅ Ye poora block copy karke paste karo
+const DiffViewer = ({ diffData }) => {
+  if (!diffData || !diffData.summary)
+    return (
+      <p className="text-xs text-gray-400 italic">No diff data available.</p>
+    );
+
+  return (
+    <div className="mt-3 bg-gray-50 rounded border border-gray-200 text-xs font-mono overflow-hidden">
+      <div className="bg-gray-100 p-2 border-b flex gap-2 font-bold uppercase tracking-wider text-[10px]">
+        <span className="text-green-600">
+          +{diffData.summary.totalAdded} Added
+        </span>
+        <span className="text-red-600">
+          -{diffData.summary.totalRemoved} Removed
+        </span>
+        <span className="text-blue-600">
+          ~{diffData.summary.totalModified} Modified
+        </span>
+      </div>
+
+      <div className="max-h-48 overflow-y-auto p-1 space-y-0.5">
+        {diffData.removed?.map((line, i) => (
+          <div key={`rem-${i}`} className="flex bg-red-50 text-red-700">
+            <span className="w-6 text-gray-400 border-r border-red-200 mr-2 text-right pr-1 select-none">
+              {line.oldLineNumber}
+            </span>
+            <span className="line-through decoration-red-300 opacity-75">
+              - {line.content}
+            </span>
+          </div>
+        ))}
+        {diffData.added?.map((line, i) => (
+          <div key={`add-${i}`} className="flex bg-green-50 text-green-700">
+            <span className="w-6 text-gray-400 border-r border-green-200 mr-2 text-right pr-1 select-none">
+              {line.newLineNumber}
+            </span>
+            <span>+ {line.content}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // Stat Card Component
 const StatCard = ({ title, count }) => (
   <div className="bg-white p-6 rounded-xl border-l-4 border-red-600 shadow-md">
@@ -18,7 +63,8 @@ const StatCard = ({ title, count }) => (
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+  const API_BASE_URL =
+    process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
   const [isLoading, setIsLoading] = useState(true);
 
   // ✅ 0. UI STATE (Responsive Sidebar)
@@ -30,10 +76,6 @@ export default function AdminDashboard() {
     email: "",
   });
   const [isAuthorized, setIsAuthorized] = useState(false);
-
-
-
-  
 
   // ✅ 2. ROUTE PROTECTION
   useEffect(() => {
@@ -67,10 +109,10 @@ export default function AdminDashboard() {
   };
 
   // --- DASHBOARD DATA & LOGIC ---
- // --- REPLACE YOUR OLD STATE VARIABLES WITH THIS ---
-  
+  // --- REPLACE YOUR OLD STATE VARIABLES WITH THIS ---
+
   // ✅ 1. Nayi Data States (Backend se aayengi)
-  
+
   const [stats, setStats] = useState({
     totalSubmissions: 0,
     published: 0,
@@ -79,11 +121,62 @@ export default function AdminDashboard() {
     approved: 0,
     rejected: 0,
   });
-  
+
   const [timeMetrics, setTimeMetrics] = useState(null); // Average time data
-  const [statusDist, setStatusDist] = useState([]);     // Chart data
-  const [articles, setArticles] = useState([]);         // Table data
-  const [editors, setEditors] = useState([]);           // Editors list
+  const [statusDist, setStatusDist] = useState([]); // Chart data
+  const [articles, setArticles] = useState([]); // Table data
+  const [editors, setEditors] = useState([]); // Editors list
+
+  const [selectedArticle, setSelectedArticle] = useState(null);
+  const [pdfViewMode, setPdfViewMode] = useState("original");
+  const [changeHistory, setChangeHistory] = useState([]);
+
+  // History fetch karne ka function
+  const fetchChangeHistory = async (articleId) => {
+    try {
+      const token = localStorage.getItem("adminToken");
+      const res = await fetch(
+        `${API_BASE_URL}/api/articles/${articleId}/change-history`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setChangeHistory(data.changeLogs || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch history", err);
+    }
+  };
+
+  // Jab bhi admin koi article khole, uski history load ho jaye
+  useEffect(() => {
+    if (selectedArticle)
+      fetchChangeHistory(selectedArticle.id || selectedArticle._id);
+  }, [selectedArticle]);
+
+  // PDF URL Fix Logic (Isse "PDF Not Found" khatam ho jayega)
+  console.log("Admin Dashboard Data Row:", selectedArticle);
+  const getPdfUrlToView = () => {
+    if (!selectedArticle) return null;
+
+    const path =
+      pdfViewMode === "original"
+        ? selectedArticle.originalPdfUrl
+        : selectedArticle.currentPdfUrl;
+
+    console.log("Current Path:", path); // 👈 Agar ye null hai toh PDF nahi dikhegi
+
+    if (!path) return null;
+
+    const fullUrl = path.startsWith("http")
+      ? path
+      : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+
+    console.log("Full PDF URL:", fullUrl); // 👈 Ye URL browser mein copy karke check karein
+    return fullUrl;
+  };
 
   // ✅ FETCH DATA (Articles + Editors)
   // --- REPLACE YOUR OLD useEffect WITH THIS ---
@@ -98,13 +191,21 @@ export default function AdminDashboard() {
         const headers = { Authorization: `Bearer ${token}` };
 
         // 🔥 Promise.all se 5 API ek saath call hongi (Super Fast)
-        const [summaryRes, metricsRes, statusRes, timelineRes, editorsRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/admin/dashboard/summary`, { headers }),
-          fetch(`${API_BASE_URL}/api/admin/dashboard/time-metrics`, { headers }),
-          fetch(`${API_BASE_URL}/api/admin/dashboard/status-distribution`, { headers }),
-          fetch(`${API_BASE_URL}/api/admin/dashboard/articles-timeline?limit=50`, { headers }), // Last 50 articles
-          fetch(`${API_BASE_URL}/api/users/editors`, { headers }),
-        ]);
+        const [summaryRes, metricsRes, statusRes, timelineRes, editorsRes] =
+          await Promise.all([
+            fetch(`${API_BASE_URL}/api/admin/dashboard/summary`, { headers }),
+            fetch(`${API_BASE_URL}/api/admin/dashboard/time-metrics`, {
+              headers,
+            }),
+            fetch(`${API_BASE_URL}/api/admin/dashboard/status-distribution`, {
+              headers,
+            }),
+            fetch(
+              `${API_BASE_URL}/api/admin/dashboard/articles-timeline?limit=50`,
+              { headers }
+            ), // Last 50 articles
+            fetch(`${API_BASE_URL}/api/users/editors`, { headers }),
+          ]);
 
         // 1. Summary Data Set Karna
         if (summaryRes.ok) {
@@ -119,14 +220,26 @@ export default function AdminDashboard() {
         }
 
         // 3. Charts Data Set Karna
+        // ✅ Naya Logic: Sirf API se aane wale 2 fields dikhayega
         if (statusRes.ok) {
           const data = await statusRes.json();
+          const counts = data.distribution?.statusCounts || {};
+          const percs = data.distribution?.percentages || {};
+
+          // Pie chart ke liye sirf real data mapping
           const chartData = [
-            { label: "Pending", count: data.distribution?.PENDING_ADMIN_REVIEW || 0 },
-            { label: "In Review", count: (data.distribution?.ASSIGNED_TO_EDITOR || 0) + (data.distribution?.UNDER_REVIEW || 0) },
-            { label: "Approved", count: data.distribution?.APPROVED || 0 },
-            { label: "Published", count: data.distribution?.PUBLISHED || 0 },
-            { label: "Rejected", count: data.distribution?.REJECTED || 0 },
+            {
+              label: "Pending",
+              count: counts.PENDING_ADMIN_REVIEW || 0,
+              percentage: percs.PENDING_ADMIN_REVIEW || 0,
+              color: "#dc2626",
+            },
+            {
+              label: "Published",
+              count: counts.PUBLISHED || 0,
+              percentage: percs.PUBLISHED || 0,
+              color: "#16a34a",
+            },
           ];
           setStatusDist(chartData);
         }
@@ -135,17 +248,24 @@ export default function AdminDashboard() {
         if (timelineRes.ok) {
           const data = await timelineRes.json();
           const rawArticles = data.articles || [];
-          
+
+          // ✅ Correct mapping for Admin
+          // ✅ Correct Mapping according to Backend Service
           const formatted = rawArticles.map((item) => ({
             id: item._id || item.id,
             title: item.title,
             author: item.authorName || "Unknown",
-            status: mapBackendStatus(item.status), 
+            status: mapBackendStatus(item.status),
             assignedTo: item.assignedEditorId || "",
             date: new Date(item.createdAt).toLocaleDateString("en-GB"),
             abstract: item.abstract,
-            pdfUrl: item.currentPdfUrl,
+
+            // 🔥 Backend fields names are exactly these:
+            originalPdfUrl: item.originalPdfUrl,
+            currentPdfUrl: item.currentPdfUrl,
+            pdfUrl: item.currentPdfUrl || item.originalPdfUrl,  // Fallback
           }));
+          setArticles(formatted);
           setArticles(formatted);
         }
 
@@ -154,7 +274,6 @@ export default function AdminDashboard() {
           const data = await editorsRes.json();
           setEditors(Array.isArray(data) ? data : data.editors || []);
         }
-
       } catch (error) {
         console.error("Dashboard Load Error:", error);
         toast.error("Failed to load dashboard statistics.");
@@ -323,19 +442,22 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex min-h-screen bg-gray-50 flex-col md:flex-row relative">
-      
       {/* 🌑 MOBILE OVERLAY (Backdrop) */}
       {isMobileMenuOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
       {/* 🔴 SIDEBAR (Responsive) */}
-      <aside 
+      <aside
         className={`fixed md:sticky top-0 h-screen w-72 bg-red-700 text-white flex flex-col shadow-2xl z-50 transition-transform duration-300 ease-in-out
-        ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+        ${
+          isMobileMenuOpen
+            ? "translate-x-0"
+            : "-translate-x-full md:translate-x-0"
+        }`}
       >
         <div className="p-8 border-b border-red-800 flex justify-between items-center">
           <div>
@@ -347,16 +469,30 @@ export default function AdminDashboard() {
             </span>
           </div>
           {/* Close Button Mobile */}
-          <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-white">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          <button
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="md:hidden text-white"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+              className="w-6 h-6"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
 
         <nav className="flex-1 px-4 mt-6 space-y-2">
-          <button 
-            onClick={() => setIsMobileMenuOpen(false)} 
+          <button
+            onClick={() => setIsMobileMenuOpen(false)}
             className="w-full text-left p-3 bg-red-800 rounded-lg font-bold"
           >
             Dashboard
@@ -386,17 +522,27 @@ export default function AdminDashboard() {
 
       {/* MAIN CONTENT */}
       <main className="flex-1 h-screen overflow-y-auto bg-gray-50 flex flex-col">
-        
         {/* HEADER */}
         <header className="bg-white h-20 border-b flex items-center justify-between px-4 md:px-10 shadow-sm sticky top-0 z-20 shrink-0">
           <div className="flex items-center gap-3">
-             {/* Hamburger Button (Mobile Only) */}
-             <button 
-              onClick={() => setIsMobileMenuOpen(true)} 
+            {/* Hamburger Button (Mobile Only) */}
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
               className="md:hidden text-gray-600 hover:text-red-700 p-1"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                className="w-7 h-7"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+                />
               </svg>
             </button>
             <h2 className="text-lg md:text-xl font-black text-gray-700 uppercase">
@@ -434,64 +580,176 @@ export default function AdminDashboard() {
 
           {/* 1️⃣ STAT CARDS (Ab Backend Data Use Kar Rahe Hain) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-            <StatCard title="Total Submissions" count={stats.totalSubmissions || 0} />
-            <StatCard title="Pending Review" count={stats.pendingReview || 0} color="border-yellow-500" />
-            <StatCard title="In Review" count={stats.underReview || 0} color="border-blue-500" />
-            <StatCard title="Published" count={stats.published || 0} color="border-green-600" />
+            <StatCard
+              title="Total Submissions"
+              count={stats.totalSubmissions || 0}
+            />
+            <StatCard
+              title="Pending Review"
+              count={stats.pendingReview || 0}
+              color="border-yellow-500"
+            />
+            <StatCard
+              title="In Review"
+              count={stats.underReview || 0}
+              color="border-blue-500"
+            />
+            <StatCard
+              title="Published"
+              count={stats.published || 0}
+              color="border-green-600"
+            />
           </div>
 
           {/* 2️⃣ CHARTS SECTION (Naye Visuals) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8 mb-8">
-            
             {/* Main Chart: Status Distribution */}
             <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-gray-100 shadow-lg">
               <div className="mb-6">
-                <h3 className="text-sm font-black text-gray-800 uppercase tracking-tighter">Article Status Trends</h3>
-                <p className="text-xs text-gray-500">Live distribution of all submissions</p>
+                <h3 className="text-sm font-black text-gray-800 uppercase tracking-tighter">
+                  Article Status Trends
+                </h3>
+                <p className="text-xs text-gray-500">
+                  Live distribution of all submissions
+                </p>
               </div>
-              <div className="relative h-64 w-full flex items-end justify-between gap-2 px-4 border-b border-gray-200 pb-2">
-                 {statusDist.length > 0 ? statusDist.map((item, index) => (
-                    <div key={index} className="flex flex-col items-center gap-2 group w-full h-full justify-end">
-                       {/* Dynamic Bar Height based on Count */}
-                       <div 
-                         className="w-8 md:w-12 bg-red-600 rounded-t-md shadow-md hover:bg-red-800 transition-all relative group-hover:-translate-y-1"
-                         style={{ height: `${Math.max(item.count * 2, 5)}%`, maxHeight: '100%' }} 
-                       >
-                         <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-bold text-gray-600 bg-white px-1 rounded shadow opacity-0 group-hover:opacity-100 transition-opacity">
-                           {item.count}
-                         </span>
-                       </div>
-                       <span className="text-[10px] md:text-xs font-bold text-gray-500 uppercase text-center leading-tight">
-                         {item.label}
-                       </span>
+              {/* ✅ Naya Visuals: Count + Percentage dono ke liye */}
+              <div className="flex flex-col md:flex-row items-center justify-around gap-10 py-4">
+                {/* PIE CHART SVG */}
+                <div className="relative w-48 h-48 group">
+                  <svg
+                    viewBox="0 0 36 36"
+                    className="w-full h-full transform -rotate-90 drop-shadow-xl"
+                  >
+                    {/* Background Circle */}
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r="15.9"
+                      fill="transparent"
+                      stroke="#f3f4f6"
+                      strokeWidth="3.5"
+                    ></circle>
+
+                    {/* Pending Segment (Red) */}
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r="15.9"
+                      fill="transparent"
+                      stroke="#dc2626"
+                      strokeWidth="3.8"
+                      strokeDasharray={`${statusDist[0]?.percentage || 0} ${
+                        100 - (statusDist[0]?.percentage || 0)
+                      }`}
+                      strokeDashoffset="0"
+                      className="transition-all duration-1000 ease-out"
+                    ></circle>
+
+                    {/* Published Segment (Green) */}
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r="15.9"
+                      fill="transparent"
+                      stroke="#16a34a"
+                      strokeWidth="3.8"
+                      strokeDasharray={`${statusDist[1]?.percentage || 0} ${
+                        100 - (statusDist[1]?.percentage || 0)
+                      }`}
+                      strokeDashoffset={`-${statusDist[0]?.percentage || 0}`}
+                      className="transition-all duration-1000 ease-out"
+                    ></circle>
+                  </svg>
+
+                  {/* Center Text (Total Count) */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-2xl font-black text-gray-800">
+                      {(statusDist[0]?.count || 0) +
+                        (statusDist[1]?.count || 0)}
+                    </span>
+                    <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">
+                      Total
+                    </span>
+                  </div>
+                </div>
+
+                {/* LEGEND BOXES (Side Labels) */}
+                <div className="flex flex-col gap-4 w-full md:w-auto">
+                  {statusDist.map((item, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-4 bg-gray-50 p-3 rounded-xl border border-gray-100 shadow-sm hover:translate-x-2 transition-transform"
+                    >
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: item.color }}
+                      ></div>
+                      <div className="flex-1">
+                        <p className="text-[10px] font-black text-gray-800 uppercase tracking-tighter">
+                          {item.label}
+                        </p>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-lg font-black text-gray-700">
+                            {item.count}
+                          </span>
+                          <span className="text-[10px] font-bold text-gray-400">
+                            ({item.percentage}%)
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                 )) : <p className="w-full text-center text-gray-400 self-center">No data available</p>}
+                  ))}
+                </div>
               </div>
             </div>
 
             {/* Side Widget: Time Metrics */}
             <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-lg flex flex-col justify-between">
-               <div>
-                 <h3 className="text-sm font-black text-gray-800 uppercase">System Efficiency</h3>
-                 <p className="text-xs text-gray-500 mb-6">Average processing times</p>
-                 
-                 <div className="space-y-4">
-                    <div className="flex justify-between items-center border-b pb-2">
-                       <span className="text-xs font-bold text-gray-500">Submit → Published</span>
-                       <span className="text-lg font-black text-green-600">
-                         {timeMetrics?.averageDays?.submissionToPublished?.toFixed(1) || "0"} <span className="text-[10px]">days</span>
-                       </span>
-                    </div>
-                    <div className="flex justify-between items-center border-b pb-2">
-                       <span className="text-xs font-bold text-gray-500">To Assign</span>
-                       <span className="text-sm font-bold text-gray-800">{timeMetrics?.averageDays?.submissionToAssigned?.toFixed(1) || "0"} days</span>
-                    </div>
-                    <div className="flex justify-between items-center border-b pb-2">
-                       <span className="text-xs font-bold text-gray-500">To Review</span>
-                       <span className="text-sm font-bold text-gray-800">{timeMetrics?.averageDays?.assignedToReviewed?.toFixed(1) || "0"} days</span>
-                    </div>
-                 </div>
-               </div>
+              <div>
+                <h3 className="text-sm font-black text-gray-800 uppercase">
+                  System Efficiency
+                </h3>
+                <p className="text-xs text-gray-500 mb-6">
+                  Average processing times
+                </p>
+
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <span className="text-xs font-bold text-gray-500">
+                      Submit → Published
+                    </span>
+                    <span className="text-lg font-black text-green-600">
+                      {timeMetrics?.averageDays?.submissionToPublished?.toFixed(
+                        1
+                      ) || "0"}{" "}
+                      <span className="text-[10px]">days</span>
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <span className="text-xs font-bold text-gray-500">
+                      To Assign
+                    </span>
+                    <span className="text-sm font-bold text-gray-800">
+                      {timeMetrics?.averageDays?.submissionToAssigned?.toFixed(
+                        1
+                      ) || "0"}{" "}
+                      days
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <span className="text-xs font-bold text-gray-500">
+                      To Review
+                    </span>
+                    <span className="text-sm font-bold text-gray-800">
+                      {timeMetrics?.averageDays?.assignedToReviewed?.toFixed(
+                        1
+                      ) || "0"}{" "}
+                      days
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           {/* 📊 END: PRO ANALYTICS SECTION */}
@@ -610,30 +868,28 @@ export default function AdminDashboard() {
                         {/* 5. Combined Actions (Publish + Delete) */}
                         <td className="p-5 text-right flex justify-end gap-3 items-center">
                           <button
+                            onClick={() => {
+                              console.log("Selected Article Data:", art);
+                              setSelectedArticle(art);
+                              setPdfViewMode("original");
+                            }}
+                            className="bg-blue-600 text-white px-3 py-2 rounded text-[10px] font-black hover:bg-blue-800 transition-colors uppercase"
+                          >
+                            Review
+                          </button>
+
+                          <button
                             onClick={() => overrideAndPublish(art.id)}
-                            className="bg-black text-white px-4 py-2 rounded text-[10px] font-black hover:bg-green-600 transition-colors uppercase"
+                            className="bg-black text-white px-3 py-2 rounded text-[10px] font-black hover:bg-green-600 transition-colors uppercase"
                           >
                             Publish
                           </button>
 
                           <button
                             onClick={() => deleteArticle(art.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all group"
-                            title="Delete Article"
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
                           >
-                            <svg
-                              className="w-5 h-5 group-hover:scale-110 transition-transform"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                              />
-                            </svg>
+                            {/* Delete Icon SVG yahan rahega */}
                           </button>
                         </td>
                       </tr>
@@ -665,7 +921,115 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
-        
+      )}
+
+      {selectedArticle && (
+        <div className="fixed inset-0 bg-white z-[60] flex flex-col overflow-hidden animate-in fade-in duration-300">
+          <header className="bg-red-700 text-white p-4 flex justify-between items-center shadow-xl">
+            <div className="flex items-center gap-4">
+              <h3 className="font-black italic text-lg uppercase">
+                Admin Review Mode
+              </h3>
+              <span className="bg-white/20 px-3 py-1 rounded-full text-xs">
+                {selectedArticle.title}
+              </span>
+            </div>
+            <button
+              onClick={() => setSelectedArticle(null)}
+              className="bg-black hover:bg-gray-800 px-6 py-2 rounded-lg text-xs font-black transition-all"
+            >
+              CLOSE REVIEW
+            </button>
+          </header>
+
+          <div className="flex flex-1 overflow-hidden p-4 gap-6 bg-gray-100">
+            {/* LEFT SIDE: PDF VIEWER */}
+            <div className="flex-1 bg-white rounded-2xl shadow-2xl relative overflow-hidden flex flex-col border border-gray-200">
+              <div className="p-4 border-b bg-gray-50 flex gap-4">
+                <button
+                  onClick={() => setPdfViewMode("original")}
+                  className={`flex-1 py-2 rounded-lg text-xs font-black transition-all ${
+                    pdfViewMode === "original"
+                      ? "bg-red-600 text-white shadow-lg"
+                      : "bg-white text-gray-400 border"
+                  }`}
+                >
+                  ORIGINAL SUBMISSION
+                </button>
+                <button
+                  onClick={() => setPdfViewMode("current")}
+                  className={`flex-1 py-2 rounded-lg text-xs font-black transition-all ${
+                    pdfViewMode === "current"
+                      ? "bg-red-600 text-white shadow-lg"
+                      : "bg-white text-gray-400 border"
+                  }`}
+                >
+                  EDITOR'S EDITED VERSION
+                </button>
+              </div>
+              {/* ✅ Sirf tabhi iframe dikhao jab URL available ho */}
+              {getPdfUrlToView() ? (
+                <iframe
+                  src={getPdfUrlToView()}
+                  className="flex-1 w-full"
+                  title="Admin Viewer"
+                />
+              ) : (
+                <div className="flex-1 flex items-center justify-center bg-gray-100 text-gray-500">
+                  <p>PDF URL not found for this article</p>
+                </div>
+              )}
+            </div>
+
+            {/* RIGHT SIDE: EDITOR'S LOGS & DIFF */}
+            <div className="w-[450px] overflow-y-auto space-y-4">
+              <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100">
+                <h4 className="font-black text-gray-800 border-b pb-3 mb-6 flex items-center gap-2 text-sm">
+                  <span>📜</span> EDITOR'S CHANGE HISTORY
+                </h4>
+
+                <div className="space-y-8">
+                  {changeHistory.length === 0 ? (
+                    <div className="text-center py-10 text-gray-400 italic text-sm">
+                      No edits recorded for this article.
+                    </div>
+                  ) : (
+                    changeHistory.map((log) => (
+                      <div
+                        key={log.id}
+                        className="relative pl-6 border-l-2 border-red-200"
+                      >
+                        <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-red-600 border-4 border-white shadow-sm"></div>
+                        <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">
+                          Version {log.versionNumber}
+                        </p>
+                        <p className="text-[10px] text-gray-400 mb-2">
+                          {new Date(log.editedAt).toLocaleString()}
+                        </p>
+                        <div className="bg-red-50 p-3 rounded-lg text-xs italic text-gray-700 border border-red-100 mb-3">
+                          "{log.comments}"
+                        </div>
+
+                        {/* DIFF VIEWER */}
+                        <DiffViewer diffData={log.diffData} />
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <button
+                  onClick={() => {
+                    overrideAndPublish(selectedArticle.id);
+                    setSelectedArticle(null);
+                  }}
+                  className="w-full mt-10 bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-black shadow-lg hover:shadow-green-200 transition-all uppercase tracking-tighter"
+                >
+                  Final Approve & Publish
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
       <ToastContainer position="top-right" autoClose={3000} theme="colored" />
     </div>

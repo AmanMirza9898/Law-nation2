@@ -1402,6 +1402,8 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
         assignedEditorId: true,
         authorEmail: true,
         secondAuthorEmail: true,
+        originalPdfUrl: true,
+        currentPdfUrl: true,
       },
     });
 
@@ -1482,6 +1484,8 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
         id: article.id,
         title: article.title,
         status: article.status,
+        originalPdfUrl: article.originalPdfUrl,
+        currentPdfUrl: article.currentPdfUrl,
       },
       changeLogs: changeLogs.map((log) => ({
         id: log.id,
