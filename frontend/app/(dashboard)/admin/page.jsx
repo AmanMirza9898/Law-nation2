@@ -18,6 +18,8 @@ const StatCard = ({ title, count }) => (
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+  const [isLoading, setIsLoading] = useState(true);
 
   // ✅ 0. UI STATE (Responsive Sidebar)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -28,6 +30,10 @@ export default function AdminDashboard() {
     email: "",
   });
   const [isAuthorized, setIsAuthorized] = useState(false);
+
+
+
+  
 
   // ✅ 2. ROUTE PROTECTION
   useEffect(() => {
@@ -61,62 +67,103 @@ export default function AdminDashboard() {
   };
 
   // --- DASHBOARD DATA & LOGIC ---
-  const [editors, setEditors] = useState([]);
-  const [articles, setArticles] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const API_BASE_URL = "http://localhost:4000";
+ // --- REPLACE YOUR OLD STATE VARIABLES WITH THIS ---
+  
+  // ✅ 1. Nayi Data States (Backend se aayengi)
+  
+  const [stats, setStats] = useState({
+    totalSubmissions: 0,
+    published: 0,
+    pendingReview: 0,
+    underReview: 0,
+    approved: 0,
+    rejected: 0,
+  });
+  
+  const [timeMetrics, setTimeMetrics] = useState(null); // Average time data
+  const [statusDist, setStatusDist] = useState([]);     // Chart data
+  const [articles, setArticles] = useState([]);         // Table data
+  const [editors, setEditors] = useState([]);           // Editors list
 
   // ✅ FETCH DATA (Articles + Editors)
+  // --- REPLACE YOUR OLD useEffect WITH THIS ---
+
   useEffect(() => {
     if (!isAuthorized) return;
 
-    const fetchData = async () => {
+    const fetchDashboardData = async () => {
       try {
         const token = localStorage.getItem("adminToken");
+        console.log("Admin Token:", token);
         const headers = { Authorization: `Bearer ${token}` };
 
-        // 1. Fetch Articles
-        const articlesRes = await fetch(`${API_BASE_URL}/api/articles`, {
-          headers,
-        });
-        const articlesData = await articlesRes.json();
-        // Isko thoda aur robust banayein
-        const articleList = Array.isArray(articlesData)
-          ? articlesData
-          : articlesData.articles || articlesData.data || [];
+        // 🔥 Promise.all se 5 API ek saath call hongi (Super Fast)
+        const [summaryRes, metricsRes, statusRes, timelineRes, editorsRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/admin/dashboard/summary`, { headers }),
+          fetch(`${API_BASE_URL}/api/admin/dashboard/time-metrics`, { headers }),
+          fetch(`${API_BASE_URL}/api/admin/dashboard/status-distribution`, { headers }),
+          fetch(`${API_BASE_URL}/api/admin/dashboard/articles-timeline?limit=50`, { headers }), // Last 50 articles
+          fetch(`${API_BASE_URL}/api/users/editors`, { headers }),
+        ]);
 
-        const formattedArticles = articleList.map((item) => ({
-          id: item._id || item.id,
-          title: item.title,
-          author: item.authorName || "Unknown",
-          status: mapBackendStatus(item.status),
-          assignedTo: item.assignedEditorId || "",
-          date: new Date(item.createdAt).toLocaleDateString("en-GB"),
-          abstract: item.abstract,
-          pdfUrl: item.currentPdfUrl,
-        }));
-        setArticles(formattedArticles);
-
-        // 2. Fetch Editors
-        const editorsRes = await fetch(`${API_BASE_URL}/api/users/editors`, {
-          headers,
-        });
-        if (editorsRes.ok) {
-          const editorsData = await editorsRes.json();
-          // Backend se array ya data object handle karna
-          const editorList = Array.isArray(editorsData)
-            ? editorsData
-            : editorsData.editors || editorsData.data || [];
-          setEditors(editorList);
+        // 1. Summary Data Set Karna
+        if (summaryRes.ok) {
+          const data = await summaryRes.json();
+          setStats(data.summary);
         }
+
+        // 2. Time Metrics Set Karna
+        if (metricsRes.ok) {
+          const data = await metricsRes.json();
+          setTimeMetrics(data.metrics);
+        }
+
+        // 3. Charts Data Set Karna
+        if (statusRes.ok) {
+          const data = await statusRes.json();
+          const chartData = [
+            { label: "Pending", count: data.distribution?.PENDING_ADMIN_REVIEW || 0 },
+            { label: "In Review", count: (data.distribution?.ASSIGNED_TO_EDITOR || 0) + (data.distribution?.UNDER_REVIEW || 0) },
+            { label: "Approved", count: data.distribution?.APPROVED || 0 },
+            { label: "Published", count: data.distribution?.PUBLISHED || 0 },
+            { label: "Rejected", count: data.distribution?.REJECTED || 0 },
+          ];
+          setStatusDist(chartData);
+        }
+
+        // 4. Table Data Set Karna (Helper function mapBackendStatus use karega)
+        if (timelineRes.ok) {
+          const data = await timelineRes.json();
+          const rawArticles = data.articles || [];
+          
+          const formatted = rawArticles.map((item) => ({
+            id: item._id || item.id,
+            title: item.title,
+            author: item.authorName || "Unknown",
+            status: mapBackendStatus(item.status), 
+            assignedTo: item.assignedEditorId || "",
+            date: new Date(item.createdAt).toLocaleDateString("en-GB"),
+            abstract: item.abstract,
+            pdfUrl: item.currentPdfUrl,
+          }));
+          setArticles(formatted);
+        }
+
+        // 5. Editors List Set Karna
+        if (editorsRes.ok) {
+          const data = await editorsRes.json();
+          setEditors(Array.isArray(data) ? data : data.editors || []);
+        }
+
       } catch (error) {
-        console.error("Error fetching data:", error);
-        toast.error("Failed to load dashboard data");
+        console.error("Dashboard Load Error:", error);
+        toast.error("Failed to load dashboard statistics.");
       } finally {
         setIsLoading(false);
       }
     };
-    fetchData();
+
+    fetchDashboardData();
   }, [isAuthorized]);
 
   const mapBackendStatus = (status) => {
@@ -202,7 +249,7 @@ export default function AdminDashboard() {
       }
 
       const response = await fetch(
-        `${API_BASE_URL}/api/articles/${id}/approve`,
+        `${API_BASE_URL}/api/articles/${id}/admin-publish`,
         {
           method: "PATCH",
           headers: {
@@ -383,127 +430,69 @@ export default function AdminDashboard() {
 
         {/* CONTENT */}
         <div className="p-4 md:p-10 space-y-6 md:space-y-10 flex-0">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-            <StatCard title="Total Submissions" count={articles.length} />
-            <StatCard
-              title="Awaiting"
-              count={articles.filter((a) => a.status === "Pending").length}
-            />
-            
-            <StatCard
-              title="Published"
-              count={articles.filter((a) => a.status === "Published").length}
-            />
+          {/* --- REPLACE STAT CARDS & CHARTS SECTION WITH THIS --- */}
+
+          {/* 1️⃣ STAT CARDS (Ab Backend Data Use Kar Rahe Hain) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            <StatCard title="Total Submissions" count={stats.totalSubmissions || 0} />
+            <StatCard title="Pending Review" count={stats.pendingReview || 0} color="border-yellow-500" />
+            <StatCard title="In Review" count={stats.underReview || 0} color="border-blue-500" />
+            <StatCard title="Published" count={stats.published || 0} color="border-green-600" />
           </div>
 
-
-          {/* 📊 START: PRO ANALYTICS SECTION */}
+          {/* 2️⃣ CHARTS SECTION (Naye Visuals) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8 mb-8">
             
-            {/* 1. MAIN CHART: Submissions vs Approvals (Double Bar) */}
+            {/* Main Chart: Status Distribution */}
             <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-gray-100 shadow-lg">
-              <div className="flex justify-between items-center mb-8">
-                <div>
-                  <h3 className="text-sm font-black text-gray-800 uppercase tracking-tighter">
-                    Submission Trends
-                  </h3>
-                  <p className="text-xs text-gray-500 font-medium mt-1">
-                    Comparison: Received vs Published
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <div className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-gray-300"></span>
-                    <span className="text-[10px] font-bold text-gray-500">Received</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-red-600"></span>
-                    <span className="text-[10px] font-bold text-gray-500">Published</span>
-                  </div>
-                </div>
+              <div className="mb-6">
+                <h3 className="text-sm font-black text-gray-800 uppercase tracking-tighter">Article Status Trends</h3>
+                <p className="text-xs text-gray-500">Live distribution of all submissions</p>
               </div>
-              
-              {/* Chart Area with Grid Background */}
-              <div className="relative h-64 w-full border-b border-gray-200">
-                {/* Background Grid Lines (0%, 25%, 50%, 75%, 100%) */}
-                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
-                  {[100, 75, 50, 25, 0].map((val) => (
-                    <div key={val} className="w-full border-t border-dashed border-gray-100 relative">
-                      <span className="absolute -left-8 -top-2 text-[10px] text-gray-400 font-bold">{val}</span>
+              <div className="relative h-64 w-full flex items-end justify-between gap-2 px-4 border-b border-gray-200 pb-2">
+                 {statusDist.length > 0 ? statusDist.map((item, index) => (
+                    <div key={index} className="flex flex-col items-center gap-2 group w-full h-full justify-end">
+                       {/* Dynamic Bar Height based on Count */}
+                       <div 
+                         className="w-8 md:w-12 bg-red-600 rounded-t-md shadow-md hover:bg-red-800 transition-all relative group-hover:-translate-y-1"
+                         style={{ height: `${Math.max(item.count * 2, 5)}%`, maxHeight: '100%' }} 
+                       >
+                         <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-bold text-gray-600 bg-white px-1 rounded shadow opacity-0 group-hover:opacity-100 transition-opacity">
+                           {item.count}
+                         </span>
+                       </div>
+                       <span className="text-[10px] md:text-xs font-bold text-gray-500 uppercase text-center leading-tight">
+                         {item.label}
+                       </span>
                     </div>
-                  ))}
-                </div>
-
-                {/* Bars Container */}
-                <div className="absolute inset-0 flex items-end justify-between px-2 pl-4">
-                  {[
-                    { day: "Mon", v1: 60, v2: 40 },
-                    { day: "Tue", v1: 45, v2: 25 },
-                    { day: "Wed", v1: 80, v2: 55 },
-                    { day: "Thu", v1: 50, v2: 30 },
-                    { day: "Fri", v1: 90, v2: 70 },
-                    { day: "Sat", v1: 35, v2: 20 },
-                    { day: "Sun", v1: 75, v2: 60 },
-                  ].map((data, i) => (
-                    <div key={i} className="flex flex-col items-center gap-1 group w-full">
-                      {/* Bar Group */}
-                      <div className="flex gap-1 h-full items-end">
-                        {/* Bar 1 (Gray) */}
-                        <div 
-                          className="w-2 md:w-4 bg-gray-300 rounded-t-sm hover:bg-gray-400 transition-all duration-300"
-                          style={{ height: `${data.v1}%` }}
-                        ></div>
-                        {/* Bar 2 (Red) */}
-                        <div 
-                          className="w-2 md:w-4 bg-red-600 rounded-t-sm shadow-md hover:bg-red-700 transition-all duration-300"
-                          style={{ height: `${data.v2}%` }}
-                        ></div>
-                      </div>
-                      <span className="text-[10px] font-bold text-gray-400 mt-2">{data.day}</span>
-                    </div>
-                  ))}
-                </div>
+                 )) : <p className="w-full text-center text-gray-400 self-center">No data available</p>}
               </div>
             </div>
 
-            {/* 2. SIDE WIDGET: Editor Performance (Donut Style) */}
+            {/* Side Widget: Time Metrics */}
             <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-lg flex flex-col justify-between">
-              <div>
-                <h3 className="text-sm font-black text-gray-800 uppercase tracking-tighter mb-1">
-                  System Health
-                </h3>
-                <p className="text-xs text-gray-500 mb-6">Article Review Efficiency</p>
-                
-                {/* CSS Conic Gradient Donut Chart */}
-                <div className="flex items-center justify-center py-4">
-                  <div className="relative w-40 h-40 rounded-full bg-gray-100 flex items-center justify-center"
-                       style={{ background: 'conic-gradient(#DC2626 75%, #F3F4F6 0)' }} // Red 75% filled
-                  >
-                    <div className="w-28 h-28 bg-white rounded-full flex flex-col items-center justify-center shadow-inner">
-                      <span className="text-3xl font-black text-gray-800">75%</span>
-                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Efficiency</span>
+               <div>
+                 <h3 className="text-sm font-black text-gray-800 uppercase">System Efficiency</h3>
+                 <p className="text-xs text-gray-500 mb-6">Average processing times</p>
+                 
+                 <div className="space-y-4">
+                    <div className="flex justify-between items-center border-b pb-2">
+                       <span className="text-xs font-bold text-gray-500">Submit → Published</span>
+                       <span className="text-lg font-black text-green-600">
+                         {timeMetrics?.averageDays?.submissionToPublished?.toFixed(1) || "0"} <span className="text-[10px]">days</span>
+                       </span>
                     </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Mini List */}
-              <div className="space-y-3 mt-4">
-                <div className="flex justify-between items-center text-xs font-bold border-b border-gray-50 pb-2">
-                  <span className="text-gray-500">Active Editors</span>
-                  <span className="text-gray-800">12 Online</span>
-                </div>
-                <div className="flex justify-between items-center text-xs font-bold border-b border-gray-50 pb-2">
-                  <span className="text-gray-500">Pending Reviews</span>
-                  <span className="text-red-600">08 Urgent</span>
-                </div>
-                <div className="flex justify-between items-center text-xs font-bold">
-                  <span className="text-gray-500">Avg. Time</span>
-                  <span className="text-green-600">2.5 Days</span>
-                </div>
-              </div>
+                    <div className="flex justify-between items-center border-b pb-2">
+                       <span className="text-xs font-bold text-gray-500">To Assign</span>
+                       <span className="text-sm font-bold text-gray-800">{timeMetrics?.averageDays?.submissionToAssigned?.toFixed(1) || "0"} days</span>
+                    </div>
+                    <div className="flex justify-between items-center border-b pb-2">
+                       <span className="text-xs font-bold text-gray-500">To Review</span>
+                       <span className="text-sm font-bold text-gray-800">{timeMetrics?.averageDays?.assignedToReviewed?.toFixed(1) || "0"} days</span>
+                    </div>
+                 </div>
+               </div>
             </div>
-
           </div>
           {/* 📊 END: PRO ANALYTICS SECTION */}
 

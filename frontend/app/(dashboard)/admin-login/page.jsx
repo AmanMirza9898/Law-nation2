@@ -63,7 +63,7 @@ export default function Adminlogin() {
     try {
       const API_URL = "http://localhost:4000/api"
       
-      const response = await fetch(`${API_URL}/auth/login`, {
+      const response = await fetch(`${API_URL}/auth/admin-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

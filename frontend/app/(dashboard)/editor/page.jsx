@@ -3,6 +3,19 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 
+// --- YAHAN PASTE KARO (ICONS) ---
+const DownloadIcon = () => (
+  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+  </svg>
+);
+const WordIcon = () => (
+  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
+// --------------------------------
+
 // Helper Component for Stats
 const EditorStatCard = ({ title, count, color }) => (
   <div className={`bg-white p-6 rounded-xl border-l-4 ${color} shadow-md`}>
@@ -144,6 +157,39 @@ export default function EditorDashboard() {
       setUploadedFile(e.target.files[0]);
     }
   };
+
+  // --- YAHAN PASTE KARO (FUNCTION) ---
+  const handleDownloadFile = async (fileUrl, fileName, type) => {
+    if (!fileUrl) return toast.error("File not available");
+    try {
+      toast.info(`Downloading ${type}...`);
+      const token = localStorage.getItem("editorToken");
+      const fullUrl = fileUrl.startsWith("http") ? fileUrl : `${API_BASE_URL}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`;
+
+      const res = await fetch(fullUrl, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) throw new Error("Download failed");
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const ext = type === "Word" ? "docx" : "pdf";
+      a.download = `${fileName}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("Download complete!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to download file");
+    }
+  };
+  // ----------------------------------
 
   const getPdfUrlToView = () => {
     if (!selectedArticle) return "";
@@ -386,6 +432,35 @@ export default function EditorDashboard() {
                     
                   </div>
                 </div>
+
+                {/* --- YAHAN PASTE KARO (BUTTONS BLOCK) --- */}
+  <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+    <h3 className="font-bold text-gray-800 mb-4">Source Files</h3>
+    <div className="flex flex-col gap-3">
+      {/* Word Button */}
+      {selectedArticle.originalWordUrl ? (
+        <button
+          onClick={() => handleDownloadFile(selectedArticle.originalWordUrl, selectedArticle.title, "Word")}
+          className="flex items-center justify-center w-full py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition shadow-sm"
+        >
+          <WordIcon /> Download Word File
+        </button>
+      ) : (
+        <div className="text-xs text-gray-400 text-center italic">Word file not available</div>
+      )}
+
+      {/* PDF Button */}
+      {selectedArticle.originalPdfUrl && (
+        <button
+          onClick={() => handleDownloadFile(selectedArticle.originalPdfUrl, selectedArticle.title, "PDF")}
+          className="flex items-center justify-center w-full py-2.5 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-black transition shadow-sm"
+        >
+          <DownloadIcon /> Download Original PDF
+        </button>
+      )}
+    </div>
+  </div>
+  {/* ---------------------------------------- */}
 
                 <div className="bg-blue-50 p-6 rounded-xl border border-blue-100">
                   <h4 className="text-sm font-bold text-blue-800 mb-2">Article Details</h4>

@@ -281,14 +281,14 @@ export default function ArticlePage() {
             )}
 
             {/* ✅ FIXED: Desktop Word Button (Now using onClick) */}
-            {!isLimited && article.currentWordUrl && (
+            {/* {!isLimited && article.currentWordUrl && (
               <button
                 onClick={() => handleDownload("word")}
                 className="hidden sm:flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 border border-blue-200 rounded-full px-4 py-2 hover:border-blue-400 transition-all ml-3"
               >
                 <WordIcon /> Word
               </button>
-            )}
+            )} */}
           </div>
         </header>
 

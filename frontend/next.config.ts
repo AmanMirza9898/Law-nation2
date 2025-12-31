@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  reactStrictMode: false,
   // output: 'export',          // Enables static export
   basePath: '/law',          // <-- Subfolder path
   assetPrefix: '/law/',      // <-- Ensures assets load correctly
