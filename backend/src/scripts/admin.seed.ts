@@ -28,6 +28,10 @@ async function main() {
     // Permission permissions
     { key: "permission.read", description: "View permissions", module: "permission" },
     { key: "permission.write", description: "Manage permissions", module: "permission" },
+
+    // Admin permissions
+    { key: "admin.read", description: "View admin dashboard", module: "admin" },
+    { key: "admin.write", description: "Manage admin settings", module: "admin" },
   ];
 
   for (const perm of permissions) {
