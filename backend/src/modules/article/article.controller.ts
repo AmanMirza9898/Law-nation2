@@ -657,26 +657,30 @@ export class ArticleController {
     }
   }
 
-  // Download diff as PDF
+  // Download diff as PDF or Word
   async downloadDiff(req: AuthRequest, res: Response) {
     try {
       const { changeLogId } = req.params;
+      const { format } = req.query;
       
       if (!changeLogId) {
         throw new BadRequestError("Change log ID is required");
       }
+
+      // Validate format
+      const downloadFormat = format === 'word' ? 'word' : 'pdf';
       
       const userId = req.user!.id;
       const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
 
-      const result = await articleService.downloadDiff(changeLogId, userId, userRoles);
+      const result = await articleService.downloadDiff(changeLogId, userId, userRoles, downloadFormat);
 
-      // Set headers for PDF download
+      // Set headers for file download
       res.setHeader('Content-Type', result.mimeType);
       res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
       res.setHeader('Content-Length', result.buffer.length);
 
-      // Send PDF buffer
+      // Send file buffer
       res.send(result.buffer);
     } catch (error) {
       throw error;

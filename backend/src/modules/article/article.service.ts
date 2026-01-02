@@ -15,6 +15,7 @@ import { extractPdfContent } from "@/utils/pdf-extract.utils.js";
 import { ensureBothFormats, getFileType } from "@/utils/file-conversion.utils.js";
 import { calculateFileDiff, generateDiffSummary, getFileTypeFromPath } from "@/utils/diff-calculator.utils.js";
 import { generateDiffPdf } from "@/utils/diff-pdf-generator.utils.js";
+import { generateDiffWord } from "@/utils/diff-word-generator.utils.js";
 import { notifyAdminOfEditorApproval, notifyUploaderOfPublication } from "@/utils/notification.utils.js";
 import type {
   ArticleSubmissionData,
@@ -1576,8 +1577,8 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
     };
   }
 
-  // ✅ NEW: Download diff as PDF
-  async downloadDiff(changeLogId: string, userId: string, userRoles: string[]) {
+  // ✅ NEW: Download diff as PDF or Word
+  async downloadDiff(changeLogId: string, userId: string, userRoles: string[], format: 'pdf' | 'word' = 'pdf') {
     const changeLog = await prisma.articleChangeLog.findUnique({
       where: { id: changeLogId },
       include: {
@@ -1622,26 +1623,37 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
       ? `${currentUser.name} (${currentUser.email})`
       : 'Unknown User';
 
-    // Generate PDF
-    console.log(`📄 [Diff PDF] Generating PDF for change log ${changeLogId}`);
-    
-    const pdfBuffer = await generateDiffPdf(
-      changeLog.diffData as any,
-      {
-        articleTitle: changeLog.article.title,
-        versionFrom: changeLog.versionNumber - 1,
-        versionTo: changeLog.versionNumber,
-        editorName: changeLog.editor?.name,
-        generatedBy,
-      }
-    );
+    const options = {
+      articleTitle: changeLog.article.title,
+      versionFrom: changeLog.versionNumber - 1,
+      versionTo: changeLog.versionNumber,
+      editorName: changeLog.editor?.name,
+      generatedBy,
+    };
 
-    console.log(`✅ [Diff PDF] Generated ${pdfBuffer.length} bytes`);
+    // Generate file based on format
+    let buffer: Buffer;
+    let filename: string;
+    let mimeType: string;
+
+    if (format === 'word') {
+      console.log(`📝 [Diff Word] Generating Word document for change log ${changeLogId}`);
+      buffer = await generateDiffWord(changeLog.diffData as any, options);
+      filename = `diff-v${changeLog.versionNumber}-${changeLog.article.id}.docx`;
+      mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      console.log(`✅ [Diff Word] Generated ${buffer.length} bytes`);
+    } else {
+      console.log(`📄 [Diff PDF] Generating PDF for change log ${changeLogId}`);
+      buffer = await generateDiffPdf(changeLog.diffData as any, options);
+      filename = `diff-v${changeLog.versionNumber}-${changeLog.article.id}.pdf`;
+      mimeType = 'application/pdf';
+      console.log(`✅ [Diff PDF] Generated ${buffer.length} bytes`);
+    }
 
     return {
-      buffer: pdfBuffer,
-      filename: `diff-v${changeLog.versionNumber}-${changeLog.article.id}.pdf`,
-      mimeType: 'application/pdf',
+      buffer,
+      filename,
+      mimeType,
     };
   }
 }
