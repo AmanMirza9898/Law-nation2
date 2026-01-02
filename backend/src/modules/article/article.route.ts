@@ -94,6 +94,14 @@ router.get(
   articleController.getArticleContent.bind(articleController)
 );
 
+// PUBLIC: Get article by slug (SEO-friendly URL)
+router.get(
+  "/slug/:slug",
+  requireAuth,
+  requirePermission("article", "read"),
+  articleController.getArticleBySlug.bind(articleController)
+);
+
 // Protected routes - Require authentication
 router.use(requireAuth);
 

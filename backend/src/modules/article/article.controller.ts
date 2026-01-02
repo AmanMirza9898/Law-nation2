@@ -273,6 +273,22 @@ export class ArticleController {
     }
   }
 
+  // Get article by slug (SEO-friendly URL)
+  async getArticleBySlug(req: AuthRequest, res: Response) {
+    try {
+      const slug = req.params.slug;
+      if (!slug) {
+        throw new BadRequestError("Article slug is required");
+      }
+
+      const article = await articleService.getArticleBySlug(slug);
+
+      res.json({ article });
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Download article PDF (protected - auth required)
   async downloadArticlePdf(req: AuthRequest, res: Response) {
     try {

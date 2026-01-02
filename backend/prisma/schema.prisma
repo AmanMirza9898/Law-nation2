@@ -105,6 +105,7 @@ model Article {
   secondAuthorPhone        String?
   secondAuthorOrganization String?
   title              String
+  slug               String            @unique
   category           String
   abstract           String
   keywords           String?
@@ -136,6 +137,7 @@ model Article {
   @@index([assignedEditorId])
   @@index([authorEmail])
   @@index([secondAuthorEmail])
+  @@index([slug])
 }
 
 model ArticleRevision {

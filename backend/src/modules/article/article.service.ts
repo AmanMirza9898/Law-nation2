@@ -17,6 +17,7 @@ import { calculateFileDiff, generateDiffSummary, getFileTypeFromPath } from "@/u
 import { generateDiffPdf } from "@/utils/diff-pdf-generator.utils.js";
 import { generateDiffWord } from "@/utils/diff-word-generator.utils.js";
 import { notifyAdminOfEditorApproval, notifyUploaderOfPublication } from "@/utils/notification.utils.js";
+import { generateUniqueSlug } from "@/utils/slug.utils.js";
 import type {
   ArticleSubmissionData,
   ArticleVerificationMetadata,
@@ -45,6 +46,10 @@ export class ArticleService {
     console.log(`📄 [Logged-in User] Converting file to both formats: ${data.pdfUrl}`);
     const { pdfPath, wordPath } = await ensureBothFormats(data.pdfUrl);
     
+    // Generate unique slug from title
+    const articleSlug = await generateUniqueSlug(data.title);
+    console.log(`🔗 [Slug] Generated slug: "${articleSlug}" from title: "${data.title}"`);
+    
     // Create article first to get ID
     const article = await prisma.article.create({
       data: {
@@ -57,6 +62,7 @@ export class ArticleService {
         ...(data.secondAuthorPhone && { secondAuthorPhone: data.secondAuthorPhone }),
         ...(data.secondAuthorOrganization && { secondAuthorOrganization: data.secondAuthorOrganization }),
         title: data.title,
+        slug: articleSlug,
         category: data.category,
         abstract: data.abstract,
         ...(data.keywords && { keywords: data.keywords }),
@@ -178,6 +184,10 @@ export class ArticleService {
     console.log(`📄 [Guest Verification] Converting file to both formats: ${permanentFileUrl}`);
     const { pdfPath, wordPath } = await ensureBothFormats(permanentFileUrl);
 
+    // Generate unique slug from title
+    const articleSlug = await generateUniqueSlug(metadata.title);
+    console.log(`🔗 [Slug] Generated slug: "${articleSlug}" from title: "${metadata.title}"`);
+
     // Create article first to get ID
     const article = await prisma.article.create({
       data: {
@@ -190,6 +200,7 @@ export class ArticleService {
         ...(metadata.secondAuthorPhone && { secondAuthorPhone: metadata.secondAuthorPhone }),
         ...(metadata.secondAuthorOrganization && { secondAuthorOrganization: metadata.secondAuthorOrganization }),
         title: metadata.title,
+        slug: articleSlug,
         category: metadata.category,
         abstract: metadata.abstract,
         ...(metadata.keywords && { keywords: metadata.keywords }),
@@ -283,6 +294,10 @@ export class ArticleService {
     console.log(`📄 [Code Verification] Converting file to both formats: ${permanentFileUrl}`);
     const { pdfPath, wordPath } = await ensureBothFormats(permanentFileUrl);
 
+    // Generate unique slug from title
+    const articleSlug = await generateUniqueSlug(metadata.title);
+    console.log(`🔗 [Slug] Generated slug: "${articleSlug}" from title: "${metadata.title}"`);
+
     // Create article
     const article = await prisma.article.create({
       data: {
@@ -295,6 +310,7 @@ export class ArticleService {
         ...(metadata.secondAuthorPhone && { secondAuthorPhone: metadata.secondAuthorPhone }),
         ...(metadata.secondAuthorOrganization && { secondAuthorOrganization: metadata.secondAuthorOrganization }),
         title: metadata.title,
+        slug: articleSlug,
         category: metadata.category,
         abstract: metadata.abstract,
         ...(metadata.keywords && { keywords: metadata.keywords }),
@@ -724,6 +740,30 @@ export class ArticleService {
     return article;
   }
 
+  // Get article by slug (SEO-friendly URL)
+  async getArticleBySlug(slug: string) {
+    const article = await prisma.article.findUnique({
+      where: { 
+        slug: slug,
+        status: "PUBLISHED"  // Only show published articles
+      },
+      include: {
+        assignedEditor: {
+          select: { id: true, name: true, email: true },
+        },
+        revisions: {
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    });
+
+    if (!article) {
+      throw new NotFoundError("Article not found or not published");
+    }
+
+    return article;
+  }
+
   // Get article preview (limited access - for non-logged-in users)
   async getArticlePreview(articleId: string) {
     const article = await prisma.article.findUnique({
@@ -1106,7 +1146,8 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
     const searchResults = await prisma.$queryRaw<any[]>`
       SELECT 
         id, 
-        title, 
+        title,
+        slug,
         abstract, 
         category, 
         keywords, 
