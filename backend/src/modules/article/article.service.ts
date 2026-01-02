@@ -625,6 +625,8 @@ export class ArticleService {
         editedBy: editorId,
         status: "pending",
         ...(data.comments && { comments: data.comments }),
+        ...(data.editorDocumentUrl && { editorDocumentUrl: data.editorDocumentUrl }),
+        ...(data.editorDocumentType && { editorDocumentType: data.editorDocumentType }),
       },
     });
 
@@ -1550,6 +1552,8 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
         comments: log.comments,
         diffSummary: generateDiffSummary(log.diffData as any),
         diffData: log.diffData, // Full diff data
+        editorDocumentUrl: log.editorDocumentUrl,
+        editorDocumentType: log.editorDocumentType,
       })),
       totalVersions: changeLogs.length + 1, // +1 for original
       accessLevel: isAdmin ? "admin" : "editor",
@@ -1615,6 +1619,8 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
       editedAt: changeLog.editedAt,
       status: changeLog.status,
       comments: changeLog.comments,
+      editorDocumentUrl: changeLog.editorDocumentUrl,
+      editorDocumentType: changeLog.editorDocumentType,
     };
   }
 
@@ -1696,6 +1702,93 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
       filename,
       mimeType,
     };
+  }
+
+  // ✅ NEW: Download editor's uploaded document with format conversion
+  async downloadEditorDocument(changeLogId: string, userId: string, userRoles: string[], format: 'pdf' | 'word' = 'pdf') {
+    const changeLog = await prisma.articleChangeLog.findUnique({
+      where: { id: changeLogId },
+      include: {
+        article: {
+          select: {
+            id: true,
+            title: true,
+            assignedEditorId: true,
+          },
+        },
+        editor: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!changeLog) {
+      throw new NotFoundError("Change log not found");
+    }
+
+    if (!changeLog.editorDocumentUrl) {
+      throw new NotFoundError("No editor document uploaded for this version");
+    }
+
+    const isAdmin = userRoles.includes("admin");
+    const isAssignedEditor = changeLog.article.assignedEditorId === userId;
+
+    // Access control - Only admin can download
+    if (!isAdmin) {
+      throw new ForbiddenError("Only admins can download editor documents");
+    }
+
+    const originalType = changeLog.editorDocumentType?.toLowerCase() || 'pdf';
+    const requestedFormat = format.toLowerCase();
+
+    console.log(`📥 [Editor Doc] Downloading editor document for change log ${changeLogId}`);
+    console.log(`   Original type: ${originalType}, Requested: ${requestedFormat}`);
+
+    // If requested format matches original, return directly
+    if (originalType === requestedFormat) {
+      console.log(`✅ [Editor Doc] Format matches, returning original file`);
+      
+      const filename = `editor-doc-v${changeLog.versionNumber}-${changeLog.article.id}.${requestedFormat === 'word' ? 'docx' : 'pdf'}`;
+      const mimeType = requestedFormat === 'word' 
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : 'application/pdf';
+
+      return {
+        filePath: changeLog.editorDocumentUrl,
+        filename,
+        mimeType,
+        needsConversion: false,
+      };
+    }
+
+    // Need to convert format
+    console.log(`🔄 [Editor Doc] Converting from ${originalType} to ${requestedFormat}`);
+    
+    try {
+      const { pdfPath, wordPath } = await ensureBothFormats(changeLog.editorDocumentUrl);
+      
+      const convertedPath = requestedFormat === 'pdf' ? pdfPath : wordPath;
+      const filename = `editor-doc-v${changeLog.versionNumber}-${changeLog.article.id}.${requestedFormat === 'word' ? 'docx' : 'pdf'}`;
+      const mimeType = requestedFormat === 'word' 
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : 'application/pdf';
+
+      console.log(`✅ [Editor Doc] Converted successfully`);
+
+      return {
+        filePath: convertedPath,
+        filename,
+        mimeType,
+        needsConversion: true,
+      };
+    } catch (error) {
+      console.error(`❌ [Editor Doc] Conversion failed:`, error);
+      throw new BadRequestError(`Failed to convert document to ${requestedFormat} format`);
+    }
   }
 }
 

@@ -695,6 +695,46 @@ export class ArticleController {
       throw error;
     }
   }
+
+  // ✅ NEW: Download editor's uploaded document
+  async downloadEditorDocument(req: AuthRequest, res: Response) {
+    try {
+      const { changeLogId } = req.params;
+      const { format } = req.query;
+      
+      if (!changeLogId) {
+        throw new BadRequestError("Change log ID is required");
+      }
+
+      // Validate format
+      const downloadFormat = format === 'word' ? 'word' : 'pdf';
+      
+      const userId = req.user!.id;
+      const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
+
+      const result = await articleService.downloadEditorDocument(changeLogId, userId, userRoles, downloadFormat);
+
+      // Read file from disk
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      
+      const fullPath = path.join(process.cwd(), result.filePath);
+      const fileBuffer = await fs.readFile(fullPath);
+
+      // Set headers for file download
+      res.setHeader('Content-Type', result.mimeType);
+      res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+      res.setHeader('Content-Length', fileBuffer.length);
+
+      console.log(`✅ [Editor Doc Download] Sending file: ${result.filename} (${fileBuffer.length} bytes)`);
+
+      // Send file buffer
+      res.send(fileBuffer);
+    } catch (error) {
+      console.error('❌ [Editor Doc Download] Failed:', error);
+      throw error;
+    }
+  }
 }
 
 export const articleController = new ArticleController();

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth, optionalAuth } from "@/middlewares/auth.middleware.js";
 import { requirePermission } from "@/middlewares/require-premission.middleware.js";
-import { uploadDocument, uploadPdfOnly, uploadOptionalPdf, uploadImage, uploadMultipleImages, uploadArticleFiles } from "@/middlewares/upload.middleware.js";
+import { uploadDocument, uploadPdfOnly, uploadOptionalPdf, uploadImage, uploadMultipleImages, uploadArticleFiles, uploadEditorFiles } from "@/middlewares/upload.middleware.js";
 import { articleController } from "./article.controller.js";
 
 const router = Router();
@@ -87,6 +87,13 @@ router.get(
   articleController.downloadDiff.bind(articleController)
 );
 
+// ✅ NEW: Download editor's uploaded document
+router.get(
+  "/:id/change-log/:changeLogId/download-editor-doc",
+  requireAuth,
+  articleController.downloadEditorDocument.bind(articleController)
+);
+
 // PUBLIC: Get article content for reading (optional auth - works for both logged and non-logged users)
 router.get(
   "/:id/content",
@@ -152,7 +159,7 @@ router.patch(
 router.patch(
   "/:id/upload-corrected",
   requirePermission("article", "write"),
-  uploadDocument, // Editor can upload PDF or Word
+  uploadEditorFiles, // Editor can upload corrected article + optional editor document
   articleController.uploadCorrectedPdf.bind(articleController)
 );
 
