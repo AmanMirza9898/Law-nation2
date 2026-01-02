@@ -656,6 +656,32 @@ export class ArticleController {
       throw error;
     }
   }
+
+  // Download diff as PDF
+  async downloadDiff(req: AuthRequest, res: Response) {
+    try {
+      const { changeLogId } = req.params;
+      
+      if (!changeLogId) {
+        throw new BadRequestError("Change log ID is required");
+      }
+      
+      const userId = req.user!.id;
+      const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
+
+      const result = await articleService.downloadDiff(changeLogId, userId, userRoles);
+
+      // Set headers for PDF download
+      res.setHeader('Content-Type', result.mimeType);
+      res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+      res.setHeader('Content-Length', result.buffer.length);
+
+      // Send PDF buffer
+      res.send(result.buffer);
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 export const articleController = new ArticleController();
