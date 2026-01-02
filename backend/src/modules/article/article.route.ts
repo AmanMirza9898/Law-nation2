@@ -80,6 +80,13 @@ router.get(
   articleController.getChangeLogDiff.bind(articleController)
 );
 
+// ✅ NEW: Download diff as PDF
+router.get(
+  "/:id/change-log/:changeLogId/download-diff",
+  requireAuth,
+  articleController.downloadDiff.bind(articleController)
+);
+
 // PUBLIC: Get article content for reading (optional auth - works for both logged and non-logged users)
 router.get(
   "/:id/content",
