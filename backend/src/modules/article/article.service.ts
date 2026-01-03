@@ -1533,6 +1533,11 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
       }
     }
 
+    // Get latest editor document from most recent change log
+    const latestChangeLog = changeLogs[changeLogs.length - 1];
+    const latestEditorDocUrl = latestChangeLog?.editorDocumentUrl || null;
+    const latestEditorDocType = latestChangeLog?.editorDocumentType || null;
+
     // Admin or assigned editor - show full history
     return {
       article: {
@@ -1541,6 +1546,8 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
         status: article.status,
         originalPdfUrl: article.originalPdfUrl,
         currentPdfUrl: article.currentPdfUrl,
+        editorDocumentUrl: latestEditorDocUrl,  // ✅ NEW: Latest editor document
+        editorDocumentType: latestEditorDocType, // ✅ NEW: Latest editor document type
       },
       changeLogs: changeLogs.map((log) => ({
         id: log.id,
