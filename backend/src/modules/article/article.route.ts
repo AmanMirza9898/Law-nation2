@@ -89,7 +89,7 @@ router.get(
 
 // ✅ NEW: Download editor's uploaded document
 router.get(
-  "/:id/change-log/:changeLogId/download-editor-doc",
+  "/change-logs/:changeLogId/editor-document",
   requireAuth,
   articleController.downloadEditorDocument.bind(articleController)
 );
