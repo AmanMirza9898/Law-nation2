@@ -112,10 +112,10 @@ async function listEditors() {
       roles: {
         some: {
           role: {
-            name: "editor"
-          }
-        }
-      }
+            name: "editor",
+          },
+        },
+      },
     },
     select: {
       id: true,
@@ -123,8 +123,8 @@ async function listEditors() {
       email: true,
     },
     orderBy: {
-      createdAt: "desc"
-    }
+      createdAt: "desc",
+    },
   });
 
   return editors;
@@ -133,8 +133,13 @@ async function listEditors() {
 /**
  * Invite an editor - sends invitation email with password setup link
  */
-async function inviteEditor(data: { name: string; email: string }, currentUser?: AuthUser) {
+async function inviteEditor(
+  data: { name: string; email: string },
+  currentUser?: AuthUser
+) {
   const { name, email } = data;
+
+  console.log(`👤 [Invite Editor] Starting invitation process for: ${email}`);
 
   // Check if user already exists
   const existingUser = await prisma.user.findUnique({
@@ -142,6 +147,7 @@ async function inviteEditor(data: { name: string; email: string }, currentUser?:
   });
 
   if (existingUser) {
+    console.log(`❌ [Invite Editor] User already exists: ${email}`);
     throw new BadRequestError("User with this email already exists");
   }
 
@@ -155,7 +161,12 @@ async function inviteEditor(data: { name: string; email: string }, currentUser?:
   });
 
   if (existingInvitation && new Date() < existingInvitation.ttl) {
-    throw new BadRequestError("An invitation has already been sent to this email. Please wait for it to expire or ask the editor to check their inbox.");
+    console.log(
+      `⚠️ [Invite Editor] Pending invitation already exists for: ${email}`
+    );
+    throw new BadRequestError(
+      "An invitation has already been sent to this email. Please wait for it to expire or ask the editor to check their inbox."
+    );
   }
 
   // Get editor role
@@ -164,23 +175,56 @@ async function inviteEditor(data: { name: string; email: string }, currentUser?:
   });
 
   if (!editorRole) {
+    console.log(`❌ [Invite Editor] Editor role not found in database`);
     throw new NotFoundError("Editor role not found. Please run database seed.");
   }
 
+  console.log(`✅ [Invite Editor] Editor role found: ${editorRole.id}`);
+
   // Create verification record with 48-hour TTL
-  const { token, expiresAt } = await VerificationService.createVerificationRecord(
-    email,
-    "EDITOR_INVITE",
-    {
-      name,
+  console.log(`🔐 [Invite Editor] Creating verification token for: ${email}`);
+  const { token, expiresAt } =
+    await VerificationService.createVerificationRecord(
       email,
-      roleId: editorRole.id,
-    },
-    48 // 48 hours
+      "EDITOR_INVITE",
+      {
+        name,
+        email,
+        roleId: editorRole.id,
+      },
+      48 // 48 hours
+    );
+
+  console.log(
+    `✅ [Invite Editor] Verification token created: ${token.substring(
+      0,
+      10
+    )}...`
   );
+  console.log(`⏰ [Invite Editor] Token expires at: ${expiresAt}`);
 
   // Send invitation email
-  await sendEditorInvitationEmail(email, name, token);
+  console.log(
+    `📧 [Invite Editor] Attempting to send invitation email to: ${email}`
+  );
+  console.log(
+    `🔗 [Invite Editor] Frontend URL: ${
+      process.env.FRONTEND_URL || "http://localhost:3000"
+    }`
+  );
+
+  try {
+    await sendEditorInvitationEmail(email, name, token);
+    console.log(
+      `✅ [Invite Editor] Invitation email sent successfully to: ${email}`
+    );
+  } catch (error) {
+    console.error(
+      `❌ [Invite Editor] Failed to send invitation email to: ${email}`
+    );
+    console.error(`❌ [Invite Editor] Error details:`, error);
+    throw error;
+  }
 
   return {
     success: true,

@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import dotenv from "dotenv";
 import { generateOtpEmailHtml } from "@/templates/email/auth/otp.template.js";
 import { generateWelcomeEmailHtml } from "@/templates/email/auth/welcome.template.js";
@@ -22,31 +22,49 @@ interface EmailOptions {
   html: string;
 }
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp.gmail.com",
-  port: parseInt(process.env.SMTP_PORT || "465"),
-  secure: process.env.SMTP_SECURE === "true" || true, 
-  auth: {
-    user: process.env.EMAIL_USER, 
-    pass: process.env.EMAIL_PASS,
-  },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Main sendEmail function
 export async function sendEmail(options: EmailOptions) {
   try {
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      throw new Error("Missing EMAIL_USER or EMAIL_PASS in .env file");
+    console.log(`📧 [Email] Attempting to send email to: ${options.to}`);
+    console.log(`📧 [Email] Subject: ${options.subject}`);
+    
+    if (!process.env.RESEND_API_KEY) {
+      console.error("❌ [Email] RESEND_API_KEY is missing in .env file");
+      throw new Error("Missing RESEND_API_KEY in .env file");
     }
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || `"Law Nation" <${process.env.EMAIL_USER}>`,
+
+    const fromAddress = process.env.SMTP_FROM || "Law Nation <onboarding@resend.dev>";
+    console.log(`📧 [Email] From address: ${fromAddress}`);
+    
+    const { data, error } = await resend.emails.send({
+      from: fromAddress,
       to: options.to,
       subject: options.subject,
       html: options.html,
     });
-    console.log(`Email sent successfully to ${options.to}`);
+
+    if (error) {
+      console.error("❌ [Email] Resend API error:", {
+        message: error.message,
+        name: error.name,
+        statusCode: (error as any).statusCode,
+        details: error
+      });
+      throw error;
+    }
+
+    console.log(`✅ [Email] Successfully sent to ${options.to}`);
+    console.log(`📧 [Email] Resend email ID: ${data?.id}`);
+    return data;
   } catch (error) {
-    console.error("Email send error:", error);
+    console.error("❌ [Email] Failed to send email:", {
+      to: options.to,
+      subject: options.subject,
+      error: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined
+    });
     throw error;
   }
 }
@@ -159,11 +177,20 @@ export async function sendEditorInvitationEmail(
   editorName: string,
   token: string
 ) {
+  console.log(`📧 [Editor Invitation] Preparing email for: ${editorEmail}`);
+  console.log(`📧 [Editor Invitation] Editor name: ${editorName}`);
+  console.log(`📧 [Editor Invitation] Token: ${token.substring(0, 10)}...`);
+  console.log(`📧 [Editor Invitation] Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
+  
   const { subject, html } = generateEditorInvitationHtml({
     editorName,
     token,
     frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000'
   });
+  
+  console.log(`📧 [Editor Invitation] Email subject: ${subject}`);
+  console.log(`📧 [Editor Invitation] Calling sendEmail function...`);
+  
   return sendEmail({ to: editorEmail, subject, html });
 }
 
