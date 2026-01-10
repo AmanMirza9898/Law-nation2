@@ -41,23 +41,6 @@ export async function addWatermarkToWord(
     
     console.log(`💧 [Word Watermark] Watermark text: ${watermarkText}`);
     
-    // Create watermark header
-    const watermarkHeader = new Header({
-      children: [
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          children: [
-            new TextRun({
-              text: watermarkText,
-              size: 16, // 8pt font
-              color: "999999", // Gray color
-              italics: true,
-            }),
-          ],
-        }),
-      ],
-    });
-    
     // Since we can't easily modify existing Word docs with docx library,
     // we'll return the original with a simple text-based watermark approach
     // For production, consider using docx-templates or officegen
