@@ -73,6 +73,14 @@ router.get(
   articleController.getArticleChangeHistory.bind(articleController)
 );
 
+// ✅ NEW: Get editor assignment history (Admin only)
+router.get(
+  "/:id/editor-history",
+  requireAuth,
+  requirePermission("article", "read"),
+  articleController.getEditorAssignmentHistory.bind(articleController)
+);
+
 // ✅ NEW: Get specific change log diff
 router.get(
   "/:id/change-log/:changeLogId",

@@ -133,3 +133,12 @@ export async function sendEditorApprovalNotificationToAdmin(
 ) {
   return emailService.sendEditorApprovalNotificationToAdmin(adminEmail, adminName, articleTitle, editorName, articleId);
 }
+
+export async function sendEditorReassignmentNotification(
+  editorEmail: string,
+  editorName: string,
+  articleTitle: string,
+  articleId: string
+) {
+  return emailService.sendEditorReassignmentNotification(editorEmail, editorName, articleTitle, articleId);
+}

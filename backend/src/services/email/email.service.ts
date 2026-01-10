@@ -15,6 +15,7 @@ import { generateEditorTaskAssignedHtml } from "@/templates/email/editor/task-as
 import { generateCoAuthorNotificationHtml } from "@/templates/email/article/coauthor-notification.template.js";
 import { generateArticlePublishedHtml } from "@/templates/email/article/published.template.js";
 import { generateEditorApprovalNotificationHtml } from "@/templates/email/admin/editor-approval.template.js";
+import { generateEditorReassignmentNotificationHtml } from "@/templates/email/editor/reassignment-notification.template.js";
 
 /**
  * Email Service
@@ -279,6 +280,26 @@ export class EmailService {
       articleId,
     });
     await this.sendEmail(adminEmail, subject, html);
+  }
+
+  /**
+   * Send editor reassignment notification to old editor
+   */
+  async sendEditorReassignmentNotification(
+    editorEmail: string,
+    editorName: string,
+    articleTitle: string,
+    articleId: string
+  ): Promise<void> {
+    console.log(`📧 [EmailService] Sending reassignment notification to: ${editorEmail}`);
+    
+    const { subject, html } = generateEditorReassignmentNotificationHtml({
+      editorName,
+      articleTitle,
+      articleId,
+    });
+    
+    await this.sendEmail(editorEmail, subject, html);
   }
 }
 
