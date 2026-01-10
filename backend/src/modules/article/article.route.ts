@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireAuth, optionalAuth } from "@/middlewares/auth.middleware.js";
 import { requirePermission } from "@/middlewares/require-premission.middleware.js";
+import { validateRecaptcha } from "@/middlewares/recaptcha.middleware.js";
 import { uploadDocument, uploadPdfOnly, uploadOptionalPdf, uploadImage, uploadMultipleImages, uploadArticleFiles, uploadEditorFiles } from "@/middlewares/upload.middleware.js";
 import { articleController } from "./article.controller.js";
 
@@ -11,6 +12,7 @@ router.post(
   "/submit",
   optionalAuth, // Check auth but don't require it
   uploadDocument, // Accept PDF or Word from users
+  validateRecaptcha, // ✅ NEW: Verify reCAPTCHA (REQUIRED - blocks bots)
   articleController.submitArticle.bind(articleController)
 );
 
@@ -19,6 +21,7 @@ router.post(
   "/submit-with-images",
   optionalAuth,
   uploadArticleFiles, // Handles PDF + thumbnail + multiple images
+  validateRecaptcha, // ✅ NEW: Verify reCAPTCHA (REQUIRED - blocks bots)
   articleController.submitArticle.bind(articleController)
 );
 

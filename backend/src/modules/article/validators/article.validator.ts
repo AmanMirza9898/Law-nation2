@@ -31,6 +31,9 @@ export const articleSubmissionSchema = z.object({
   remarksToEditor: z.string().optional(),
   thumbnailUrl: z.string().optional(),
   imageUrls: z.array(z.string()).optional(),
+  
+  // reCAPTCHA token (required for bot protection)
+  recaptchaToken: z.string().min(1, "reCAPTCHA verification is required"),
 }).refine(
   (data) => {
     // If second author name is provided, email must also be provided
