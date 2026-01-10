@@ -160,12 +160,10 @@ export default function SubmitPaperPage() {
       return;
     }
 
-    // --- YE CODE ADD KARO ---
     if (!formData.declarationAccepted) {
       toast.error("Please agree to the declaration to submit.");
       return;
     }
-    // ------------------------
 
     setIsLoading(true);
     setStatus({ type: "", message: "" });
@@ -179,32 +177,31 @@ export default function SubmitPaperPage() {
         formData.submissionOnBehalfName
           ? formData.submissionOnBehalfName
           : formData.fullName;
+          
       data.append("authorName", finalAuthorName);
       data.append("authorEmail", formData.email);
       data.append("authorPhone", formData.phone);
+      
       if (formData.secondAuthorName)
         data.append("secondAuthorName", formData.secondAuthorName);
       if (formData.secondAuthorEmail)
         data.append("secondAuthorEmail", formData.secondAuthorEmail);
+        
       data.append("title", formData.articleTitle);
       data.append("category", formData.contentFormat);
       data.append("abstract", formData.detailedDescription);
       data.append("keywords", formData.keywords.join(", "));
 
-      // ✅ CHANGE 1: Naam 'document' ki jagah 'pdf' hona chahiye (Backend yehi maangta hai)
+      // PDF and Image
       data.append("pdf", formData.file);
-
-      // ✅ CHANGE 2: Thumbnail Image Append
       if (formData.authorImage) {
         data.append("thumbnail", formData.authorImage);
       }
 
-      // Token Check
       const token = localStorage.getItem("authToken");
       const API_URL =
         process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/articles";
 
-      // ✅ CHANGE 3: URL '/submit-with-images' hona chahiye
       const response = await fetch(`${API_URL}/submit-with-images`, {
         method: "POST",
         headers: {
@@ -215,15 +212,31 @@ export default function SubmitPaperPage() {
 
       const result = await response.json();
 
+      // --- 👇 ERROR HANDLING FIX ---
       if (!response.ok) {
-        // Error message dikhayein
-        throw new Error(result.message || result.error || "Submission failed");
-      }
+        // Step 1: Variable declare karo
+        let errorMessage = "Submission failed"; 
 
-      // Success Logic
+        // Step 2: Check karo ki error Array hai ya Object
+        if (Array.isArray(result) && result.length > 0 && result[0].message) {
+          errorMessage = result[0].message; // Screenshot wala case
+        } 
+        else if (result.message) {
+           errorMessage = typeof result.message === 'string' ? result.message : JSON.stringify(result.message);
+        }
+        else if (result.error) {
+           errorMessage = result.error;
+        }
+
+        // Step 3: Error throw karo (sirf tab jab response ok na ho)
+        throw new Error(errorMessage); 
+      }
+      // -----------------------------
+
+      // Success Logic (Ye ab safe hai)
       if (result.requiresVerification) {
         toast.info("Verification code sent to your email.");
-        setShowVerification(true); // 👈 OTP UI show
+        setShowVerification(true);
         setPendingArticleId(result.articleId);
       } else {
         toast.success("Article submitted successfully!");
@@ -232,7 +245,6 @@ export default function SubmitPaperPage() {
         setFormData(initialFormState);
         setCurrentStep(1);
         if (fileInputRef.current) fileInputRef.current.value = "";
-        // Author image input bhi reset karein
         const imgInput = document.getElementById("authorImage");
         if (imgInput) imgInput.value = "";
       }
@@ -577,7 +589,7 @@ export default function SubmitPaperPage() {
                       htmlFor="fullName"
                       className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2"
                     >
-                      Author Name*
+                      Author Name <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -603,7 +615,7 @@ export default function SubmitPaperPage() {
                         htmlFor="email"
                         className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2"
                       >
-                        Email Address*
+                        Email Address <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="email"

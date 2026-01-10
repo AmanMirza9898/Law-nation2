@@ -80,6 +80,7 @@ function SetupForm() {
       <div className="p-8 text-center border-b border-gray-100">
         <h1 className="text-3xl font-black italic tracking-tighter text-red-700">LAW NATION</h1>
         <p className="text-gray-500 text-sm mt-2 font-medium">Secure your account</p>
+        <p className="text-red-500">Password must be 8 characters</p>
       </div>
 
       {/* Form Section */}
@@ -90,9 +91,9 @@ function SetupForm() {
           <input
             type="password"
             required
-            minLength={6}
+            minLength={8}
             className="w-full p-3 bg-white border border-gray-300 rounded text-sm text-gray-800 focus:border-red-700 focus:outline-none transition-colors"
-            placeholder="Min 6 characters"
+            placeholder="Min 8 characters"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
@@ -103,7 +104,7 @@ function SetupForm() {
           <input
             type="password"
             required
-            minLength={6}
+            minLength={8}
             className="w-full p-3 bg-white border border-gray-300 rounded text-sm text-gray-800 focus:border-red-700 focus:outline-none transition-colors"
             placeholder="Re-enter password"
             value={confirmPassword}
