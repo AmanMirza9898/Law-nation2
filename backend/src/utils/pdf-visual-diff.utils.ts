@@ -1,7 +1,8 @@
 import { PDFDocument, rgb, PDFPage } from 'pdf-lib';
 import fs from 'fs';
 import path from 'path';
-import { calculatePdfDifferences, TextChange } from './pdf-diff-calculator.utils.js';
+import { calculatePdfDifferences } from './pdf-diff-calculator.utils.js';
+import type { TextChange } from './pdf-diff-calculator.utils.js';
 
 /**
  * Generate visual diff PDF with markup
@@ -51,10 +52,12 @@ export async function generateVisualDiffPdf(
     
     // Add visual markup to each page
     for (const [pageNum, changes] of changesByPage.entries()) {
-      if (pageNum <= pages.length) {
+      if (pageNum > 0 && pageNum <= pages.length) {
         const page = pages[pageNum - 1];
-        console.log(`🎨 [Visual Diff] Adding markup to page ${pageNum}: ${changes.length} changes`);
-        addMarkupToPage(page, changes);
+        if (page) {
+          console.log(`🎨 [Visual Diff] Adding markup to page ${pageNum}: ${changes.length} changes`);
+          addMarkupToPage(page, changes);
+        }
       }
     }
     

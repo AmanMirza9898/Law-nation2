@@ -1,5 +1,7 @@
-import { diffWords, diffLines, Change } from 'diff';
-import { extractTextWithPositions, PageText, WordPosition } from './pdf-text-extract.utils.js';
+import { diffWords, diffLines } from 'diff';
+import type { Change } from 'diff';
+import { extractTextWithPositions } from './pdf-text-extract.utils.js';
+import type { PageText, WordPosition } from './pdf-text-extract.utils.js';
 
 /**
  * Change type

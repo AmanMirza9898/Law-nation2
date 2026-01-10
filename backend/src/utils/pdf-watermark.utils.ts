@@ -54,7 +54,7 @@ export async function addWatermarkToPdf(
     console.log(`📄 [Watermark] PDF has ${pages.length} pages`);
     
     // 3. Load logo image
-    let logoImage;
+    let logoImage: Awaited<ReturnType<typeof pdfDoc.embedPng>> | undefined;
     try {
       const logoPath = path.join(process.cwd(), 'src', 'assests', 'img', 'Screenshot 2026-01-09 204120.png');
       console.log('🖼️ [Watermark] Loading logo from:', logoPath);
