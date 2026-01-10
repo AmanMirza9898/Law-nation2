@@ -186,6 +186,7 @@ model ArticleChangeLog {
   newFileUrl          String
   fileType            String   // "PDF" or "WORD"
   diffData            Json     // {added: [], removed: [], modified: []}
+  visualDiffUrl       String?  // Path to visual diff PDF with markup
   editedBy            String
   editedAt            DateTime @default(now())
   status              String   @default("pending") // "pending", "approved", "published"

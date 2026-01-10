@@ -922,6 +922,49 @@ export class ArticleController {
       throw error;
     }
   }
+
+  // ✅ NEW: View visual diff (Editor and Admin only)
+  async viewVisualDiff(req: AuthRequest, res: Response) {
+    try {
+      const { changeLogId } = req.params;
+      
+      if (!changeLogId) {
+        throw new BadRequestError("Change log ID is required");
+      }
+
+      const userId = req.user!.id;
+      const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
+
+      // Get visual diff info
+      const result = await articleService.getVisualDiff(changeLogId, userId, userRoles);
+
+      // If visual diff doesn't exist, generate it
+      if (!result.visualDiffUrl) {
+        console.log(`🎨 [Visual Diff] Visual diff not found, generating...`);
+        const visualDiffPath = await articleService.generateVisualDiff(changeLogId);
+        result.visualDiffUrl = visualDiffPath;
+      }
+
+      // Read visual diff PDF
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      
+      const fullPath = path.join(process.cwd(), result.visualDiffUrl);
+      const pdfBuffer = await fs.readFile(fullPath);
+
+      // Send PDF
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="visual-diff-v${result.versionNumber}.pdf"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+
+      console.log(`✅ [Visual Diff] Sending visual diff: ${result.visualDiffUrl} (${pdfBuffer.length} bytes)`);
+
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('❌ [Visual Diff] Failed:', error);
+      throw error;
+    }
+  }
 }
 
 export const articleController = new ArticleController();

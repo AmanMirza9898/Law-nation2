@@ -1960,6 +1960,107 @@ async getArticleContent(articleId: string, isAuthenticated: boolean = false) {
       throw new BadRequestError(`Failed to convert document to ${requestedFormat} format`);
     }
   }
+
+  // ✅ NEW: Generate visual diff PDF
+  async generateVisualDiff(changeLogId: string): Promise<string> {
+    console.log(`🎨 [Visual Diff] Generating visual diff for change log ${changeLogId}`);
+    
+    const changeLog = await prisma.articleChangeLog.findUnique({
+      where: { id: changeLogId },
+      include: {
+        article: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+      },
+    });
+
+    if (!changeLog) {
+      throw new NotFoundError("Change log not found");
+    }
+
+    // Only generate for PDF files
+    if (changeLog.fileType !== 'PDF') {
+      throw new BadRequestError("Visual diff is only supported for PDF files");
+    }
+
+    try {
+      const { generateVisualDiffFromChangeLog } = await import('@/utils/pdf-visual-diff.utils.js');
+      
+      // Generate visual diff
+      const visualDiffPath = await generateVisualDiffFromChangeLog(
+        changeLogId,
+        changeLog.article.id,
+        changeLog.versionNumber,
+        changeLog.oldFileUrl,
+        changeLog.newFileUrl
+      );
+
+      // Convert to relative path
+      const relativePath = visualDiffPath.replace(process.cwd(), '').replace(/\\/g, '/');
+
+      // Update change log with visual diff path
+      await prisma.articleChangeLog.update({
+        where: { id: changeLogId },
+        data: { visualDiffUrl: relativePath },
+      });
+
+      console.log(`✅ [Visual Diff] Generated and saved: ${relativePath}`);
+      return relativePath;
+      
+    } catch (error) {
+      console.error(`❌ [Visual Diff] Generation failed:`, error);
+      throw new BadRequestError(`Failed to generate visual diff: ${error}`);
+    }
+  }
+
+  // ✅ NEW: Get visual diff
+  async getVisualDiff(
+    changeLogId: string,
+    userId: string,
+    userRoles: string[]
+  ): Promise<{
+    visualDiffUrl: string | null;
+    articleId: string;
+    articleTitle: string;
+    versionNumber: number;
+  }> {
+    const changeLog = await prisma.articleChangeLog.findUnique({
+      where: { id: changeLogId },
+      include: {
+        article: {
+          select: {
+            id: true,
+            title: true,
+            assignedEditorId: true,
+          },
+        },
+      },
+    });
+
+    if (!changeLog) {
+      throw new NotFoundError("Change log not found");
+    }
+
+    const isAdmin = userRoles.includes("admin");
+    const isAssignedEditor = changeLog.article.assignedEditorId === userId;
+
+    // Access control: Only admin and assigned editor
+    if (!isAdmin && !isAssignedEditor) {
+      throw new ForbiddenError(
+        "You do not have permission to view this visual diff"
+      );
+    }
+
+    return {
+      visualDiffUrl: changeLog.visualDiffUrl,
+      articleId: changeLog.article.id,
+      articleTitle: changeLog.article.title,
+      versionNumber: changeLog.versionNumber,
+    };
+  }
 }
 
 export const articleService = new ArticleService();

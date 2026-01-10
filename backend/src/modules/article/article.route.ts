@@ -199,6 +199,14 @@ router.get(
   articleController.downloadArticleWord.bind(articleController)
 );
 
+// ✅ NEW: View visual diff (Editor and Admin only)
+router.get(
+  "/:id/change-log/:changeLogId/visual-diff",
+  requireAuth,
+  requirePermission("article", "read"),
+  articleController.viewVisualDiff.bind(articleController)
+);
+
 // LEGACY: Keep old download route for backward compatibility (downloads PDF)
 router.get(
   "/:id/download",
