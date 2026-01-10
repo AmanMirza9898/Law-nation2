@@ -43,7 +43,13 @@ export class EmailService {
       });
 
       if (!result.success) {
-        throw new Error(result.error || "Failed to send email");
+        console.error("❌ [EmailService] Failed to send email:", {
+          to,
+          subject,
+          error: result.error || "Failed to send email",
+        });
+        // Don't throw - log error and continue (non-blocking email)
+        return;
       }
 
       console.log(`✅ [EmailService] Email sent successfully via ${result.provider}`);
@@ -53,7 +59,7 @@ export class EmailService {
         subject,
         error: error instanceof Error ? error.message : error,
       });
-      throw error;
+      // Don't throw - log error and continue (non-blocking email)
     }
   }
 

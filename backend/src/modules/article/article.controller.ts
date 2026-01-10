@@ -1,4 +1,4 @@
-import type { Response } from "express";
+import type { Response, NextFunction } from "express";
 import type { AuthRequest } from "@/types/auth-request.js";
 import { articleService } from "./article.service.js";
 import { BadRequestError } from "@/utils/http-errors.util.js";
@@ -19,7 +19,7 @@ import type {
 
 export class ArticleController {
   // Article submission (works for both guest and logged-in users)
-  async submitArticle(req: AuthRequest, res: Response) {
+  async submitArticle(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       if (!req.fileMeta?.url) {
         throw new BadRequestError("PDF file is required");
@@ -58,12 +58,12 @@ export class ArticleController {
         });
       }
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // Verify email and create article (public endpoint)
-  async verifyArticleSubmission(req: AuthRequest, res: Response) {
+  async verifyArticleSubmission(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { token } = req.params;
 
@@ -89,7 +89,7 @@ export class ArticleController {
   }
 
   // Verify article by code (public endpoint - JSON response)
-  async verifyArticleByCode(req: AuthRequest, res: Response) {
+  async verifyArticleByCode(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { email, code } = req.body;
 
@@ -108,12 +108,12 @@ export class ArticleController {
       return res.status(200).json(result);
     } catch (error) {
       console.error("Code Verification Error:", error);
-      throw error;
+      next(error);
     }
   }
 
   // Resend verification code (public endpoint)
-  async resendVerificationCode(req: AuthRequest, res: Response) {
+  async resendVerificationCode(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { email } = req.body;
 
@@ -126,12 +126,12 @@ export class ArticleController {
       return res.status(200).json(result);
     } catch (error) {
       console.error("Resend Code Error:", error);
-      throw error;
+      next(error);
     }
   }
 
   // Admin assigns editor
-  async assignEditor(req: AuthRequest, res: Response) {
+  async assignEditor(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = req.params.id;
       if (!articleId) {
@@ -154,12 +154,12 @@ export class ArticleController {
         newEditor: result.newEditor,
       });
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // Editor or Admin approves article (Option A)
-  async approveArticle(req: AuthRequest, res: Response) {
+  async approveArticle(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = req.params.id;
       if (!articleId) {
@@ -176,12 +176,12 @@ export class ArticleController {
         article,
       });
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
 
-  async getPublishedArticles(req: AuthRequest, res: Response) {
+  async getPublishedArticles(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       
       const filters: ArticleListFilters = {
@@ -193,12 +193,12 @@ export class ArticleController {
 
       res.json(result);
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // Editor uploads corrected PDF (Option C - Step 1)
-  async uploadCorrectedPdf(req: AuthRequest, res: Response) {
+  async uploadCorrectedPdf(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = req.params.id;
       if (!articleId) {
@@ -228,24 +228,24 @@ export class ArticleController {
         article,
       });
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // List articles with filters
-  async listArticles(req: AuthRequest, res: Response) {
+  async listArticles(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const filters: ArticleListFilters = req.query;
       const result = await articleService.listArticles(filters);
 
       res.json(result);
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // Get article preview (public - no auth required)
-  async getArticlePreview(req: AuthRequest, res: Response) {
+  async getArticlePreview(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = req.params.id;
       if (!articleId) {
@@ -259,12 +259,12 @@ export class ArticleController {
         message: "Login to read full article and download PDF" 
       });
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // Get full article details (protected - auth required)
-  async getArticleById(req: AuthRequest, res: Response) {
+  async getArticleById(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = req.params.id;
       if (!articleId) {
@@ -275,12 +275,12 @@ export class ArticleController {
 
       res.json({ article });
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // Get article by slug (SEO-friendly URL)
-  async getArticleBySlug(req: AuthRequest, res: Response) {
+  async getArticleBySlug(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const slug = req.params.slug;
       if (!slug) {
@@ -291,12 +291,12 @@ export class ArticleController {
 
       res.json({ article });
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // Get article content by slug (with 250-word limit for guests)
-  async getArticleContentBySlug(req: AuthRequest, res: Response) {
+  async getArticleContentBySlug(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const slug = req.params.slug;
       if (!slug) {
@@ -318,12 +318,12 @@ export class ArticleController {
         requiresLogin: !isAuthenticated && content.isLimited
       });
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // Download article PDF (protected - auth required)
-  async downloadArticlePdf(req: AuthRequest, res: Response) {
+  async downloadArticlePdf(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = req.params.id;
       if (!articleId) {
@@ -364,12 +364,12 @@ export class ArticleController {
       res.send(watermarkedPdf);
     } catch (error) {
       console.error('❌ [Download] Failed:', error);
-      throw error;
+      next(error);
     }
   }
 
   // Download article Word (protected - auth required, all logged-in users)
-  async downloadArticleWord(req: AuthRequest, res: Response) {
+  async downloadArticleWord(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = req.params.id;
       if (!articleId) {
@@ -410,12 +410,12 @@ export class ArticleController {
       res.send(watermarkedWord);
     } catch (error) {
       console.error('❌ [Download] Failed:', error);
-      throw error;
+      next(error);
     }
   }
 
   // Delete article
-  async deleteArticle(req: AuthRequest, res: Response) {
+  async deleteArticle(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = req.params.id;
       if (!articleId) {
@@ -426,12 +426,12 @@ export class ArticleController {
 
       res.json(result);
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // Get article content for reading (public endpoint with optional auth)
-  async getArticleContent(req: AuthRequest, res: Response) {
+  async getArticleContent(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = req.params.id;
       if (!articleId) {
@@ -458,12 +458,12 @@ export class ArticleController {
         });
       }
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // Get article upload history (protected endpoint)
-  async getArticleHistory(req: AuthRequest, res: Response) {
+  async getArticleHistory(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = req.params.id;
       if (!articleId) {
@@ -477,12 +477,12 @@ export class ArticleController {
         ...result,
       });
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // Search articles (public endpoint with enhanced filters)
-  async searchArticles(req: AuthRequest, res: Response) {
+  async searchArticles(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { 
         q, 
@@ -561,12 +561,12 @@ export class ArticleController {
         ...result,
       });
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // Upload thumbnail for article
-  async uploadThumbnail(req: AuthRequest, res: Response) {
+  async uploadThumbnail(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = req.params.id;
       if (!articleId) {
@@ -584,12 +584,12 @@ export class ArticleController {
         article,
       });
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // Upload multiple images for article
-  async uploadImages(req: AuthRequest, res: Response) {
+  async uploadImages(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = req.params.id;
       if (!articleId) {
@@ -608,12 +608,12 @@ export class ArticleController {
         article,
       });
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // ✅ NEW: Editor approves article
-  async editorApproveArticle(req: AuthRequest, res: Response) {
+  async editorApproveArticle(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = req.params.id;
       if (!articleId) {
@@ -629,12 +629,12 @@ export class ArticleController {
         article,
       });
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // ✅ NEW: Admin publishes article (only after editor approval)
-  async adminPublishArticle(req: AuthRequest, res: Response) {
+  async adminPublishArticle(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = req.params.id;
       if (!articleId) {
@@ -651,12 +651,12 @@ export class ArticleController {
         diffSummary: result.diffSummary,
       });
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // ✅ NEW: Get article change history
-  async getArticleChangeHistory(req: AuthRequest, res: Response) {
+  async getArticleChangeHistory(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = req.params.id;
       if (!articleId) {
@@ -673,12 +673,12 @@ export class ArticleController {
         ...result,
       });
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // ✅ NEW: Get specific change log diff
-  async getChangeLogDiff(req: AuthRequest, res: Response) {
+  async getChangeLogDiff(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const changeLogId = req.params.changeLogId;
       if (!changeLogId) {
@@ -695,12 +695,12 @@ export class ArticleController {
         changeLog: result,
       });
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // Download diff as PDF or Word
-  async downloadDiff(req: AuthRequest, res: Response) {
+  async downloadDiff(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { changeLogId } = req.params;
       const { format } = req.query;
@@ -768,7 +768,8 @@ export class ArticleController {
           try {
             await fs.unlink(tempFilePath);
           } catch {}
-          throw error;
+          next(error);
+          return;
         }
       } else {
         // Save buffer to temp file, add watermark, then delete
@@ -804,7 +805,8 @@ export class ArticleController {
           try {
             await fs.unlink(tempFilePath);
           } catch {}
-          throw error;
+          next(error);
+          return;
         }
       }
       
@@ -819,12 +821,12 @@ export class ArticleController {
       res.send(watermarkedBuffer);
     } catch (error) {
       console.error('❌ [Diff Download] Failed:', error);
-      throw error;
+      next(error);
     }
   }
 
   // ✅ NEW: Download editor's uploaded document
-  async downloadEditorDocument(req: AuthRequest, res: Response) {
+  async downloadEditorDocument(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { changeLogId } = req.params;
       const { format } = req.query;
@@ -897,12 +899,12 @@ export class ArticleController {
       res.send(watermarkedBuffer);
     } catch (error) {
       console.error('❌ [Editor Doc Download] Failed:', error);
-      throw error;
+      next(error);
     }
   }
 
   // Get editor assignment history for an article (Admin only)
-  async getEditorAssignmentHistory(req: AuthRequest, res: Response) {
+  async getEditorAssignmentHistory(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const articleId = req.params.id;
       if (!articleId) {
@@ -919,12 +921,12 @@ export class ArticleController {
         ...result,
       });
     } catch (error) {
-      throw error;
+      next(error);
     }
   }
 
   // ✅ NEW: View visual diff (Editor and Admin only)
-  async viewVisualDiff(req: AuthRequest, res: Response) {
+  async viewVisualDiff(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { changeLogId } = req.params;
       
@@ -962,7 +964,7 @@ export class ArticleController {
       res.send(pdfBuffer);
     } catch (error) {
       console.error('❌ [Visual Diff] Failed:', error);
-      throw error;
+      next(error);
     }
   }
 }
