@@ -158,3 +158,5 @@ export async function generateVisualDiffFromChangeLog(
   // Generate visual diff
   return await generateVisualDiffPdf(originalPdfPath, modifiedPdfPath, outputPath);
 }
+
+

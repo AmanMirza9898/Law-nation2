@@ -141,6 +141,39 @@ export default function EditorDashboard() {
   const [uploadComment, setUploadComment] = useState("");
   const [isUploading, setIsUploading] = useState(false);
 
+  const [visualDiffBlobUrl, setVisualDiffBlobUrl] = useState(null);
+
+  const handleViewVisualDiff = async (changeLogId) => {
+    try {
+      toast.info("Generating Visual Diff...");
+      const token = localStorage.getItem("editorToken");
+      const articleId = selectedArticle.id || selectedArticle._id;
+
+      const res = await fetch(
+        `${API_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/visual-diff`,
+        {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!res.ok) throw new Error("Failed to load visual diff");
+
+      // Backend se PDF blob aayega
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      setVisualDiffBlobUrl(url); // URL save karo
+      setPdfViewMode("visual-diff"); // View mode badlo
+
+      // Mobile menu band karo agar khula hai
+      if (isMobileMenuOpen) setIsMobileMenuOpen(false);
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not load visual diff.");
+    }
+  };
+
   // 📊 Chart Data Calculations
   const totalTasks = articles.length || 0;
   const completedTasks =
@@ -213,36 +246,42 @@ export default function EditorDashboard() {
 
   // ... existing fetchAssignedArticles function ...
 
-const fetchChangeHistory = async (articleId) => {
-  try {
-    const token = localStorage.getItem("editorToken");
-    const res = await fetch(`${API_BASE_URL}/api/articles/${articleId}/change-history`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      setChangeHistory(data.changeLogs || []);
+  const fetchChangeHistory = async (articleId) => {
+    try {
+      const token = localStorage.getItem("editorToken");
+      const res = await fetch(
+        `${API_BASE_URL}/api/articles/${articleId}/change-history`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setChangeHistory(data.changeLogs || []);
 
-      // ✅ Loop Fix: Pehle check karo ki kya backend se naya URL aaya hai
-      if (data.article?.editorDocumentUrl && selectedArticle?.editorDocumentUrl !== data.article.editorDocumentUrl) {
-        setSelectedArticle(prev => ({
-          ...prev,
-          editorDocumentUrl: data.article.editorDocumentUrl
-        }));
+        // ✅ Loop Fix: Pehle check karo ki kya backend se naya URL aaya hai
+        if (
+          data.article?.editorDocumentUrl &&
+          selectedArticle?.editorDocumentUrl !== data.article.editorDocumentUrl
+        ) {
+          setSelectedArticle((prev) => ({
+            ...prev,
+            editorDocumentUrl: data.article.editorDocumentUrl,
+          }));
+        }
       }
+    } catch (err) {
+      console.error("Failed to fetch history", err);
     }
-  } catch (err) {
-    console.error("Failed to fetch history", err);
-  }
-};
+  };
 
   // ✅ USE EFFECT: Jab selectedArticle change ho, tab history lao
   useEffect(() => {
-  const articleId = selectedArticle?.id || selectedArticle?._id;
-  if (articleId) {
-    fetchChangeHistory(articleId);
-  }
-}, [selectedArticle?.id, selectedArticle?._id]); // ✅ Sirf ID track hogi, loop ruk jayega
+    const articleId = selectedArticle?.id || selectedArticle?._id;
+    if (articleId) {
+      fetchChangeHistory(articleId);
+    }
+  }, [selectedArticle?.id, selectedArticle?._id]); // ✅ Sirf ID track hogi, loop ruk jayega
 
   // ❌ DELETE OLD: handleArticleAction function hata do.
 
@@ -430,25 +469,30 @@ const fetchChangeHistory = async (articleId) => {
   };
 
   // --- Update getPdfUrlToView Function ---
-const getPdfUrlToView = () => {
-  if (!selectedArticle) return "";
-  let path = "";
+  // ✅ STEP 2: REPLACE THIS FUNCTION (Pura function replace karo)
+  const getPdfUrlToView = () => {
+    if (!selectedArticle) return "";
 
-  if (pdfViewMode === "original") {
-    path = selectedArticle.originalPdfUrl;
-  } else if (pdfViewMode === "current") {
-    path = selectedArticle.currentPdfUrl;
-  } else if (pdfViewMode === "track") {
-    // ✅ Backend ne jo naya field diya hai use priority dein
-    path = selectedArticle.editorDocumentUrl; 
-  }
+    // Naya mode handle karo
+    if (pdfViewMode === "visual-diff") {
+      return visualDiffBlobUrl;
+    }
 
-  if (!path) return "";
-  
-  return path.startsWith("http")
-    ? path
-    : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
-};
+    let path = "";
+    if (pdfViewMode === "original") {
+      path = selectedArticle.originalPdfUrl;
+    } else if (pdfViewMode === "current") {
+      path = selectedArticle.currentPdfUrl;
+    } else if (pdfViewMode === "track") {
+      path = selectedArticle.editorDocumentUrl;
+    }
+
+    if (!path) return "";
+
+    return path.startsWith("http")
+      ? path
+      : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+  };
 
   if (!isAuthorized)
     return (
@@ -556,7 +600,6 @@ const getPdfUrlToView = () => {
                   </span>
                 )}
               </button>
-
               {pdfViewMode === "track" && (
                 <div className="px-3 mt-1">
                   <p className="text-[10px] text-red-200 mb-1">
@@ -564,7 +607,6 @@ const getPdfUrlToView = () => {
                   </p>
                 </div>
               )}
-
               <button
                 onClick={() => {
                   setPdfViewMode("current");
@@ -583,7 +625,6 @@ const getPdfUrlToView = () => {
                   </span>
                 )}
               </button>
-
               <button
                 onClick={() => {
                   setPdfViewMode("track"); // ✅ Naya mode
@@ -603,6 +644,30 @@ const getPdfUrlToView = () => {
                 )}
               </button>
 
+              <button
+                onClick={() => {
+                  if (!visualDiffBlobUrl) {
+                    toast.info(
+                      "Please open Change History and click 'View Visual Diff' on a version first."
+                    );
+                  } else {
+                    setPdfViewMode("visual-diff");
+                    setIsMobileMenuOpen(false);
+                  }
+                }}
+                className={`w-full text-left p-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+                  pdfViewMode === "visual-diff"
+                    ? "bg-white text-red-700 shadow-lg"
+                    : "hover:bg-red-800 text-white"
+                }`}
+              >
+                <span>👁️</span> View Visual Diff
+                {pdfViewMode === "visual-diff" && (
+                  <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 rounded-full">
+                    Active
+                  </span>
+                )}
+              </button>
               {/* {pdfViewMode === "track" && getPdfUrlToView() && (
                 <button
                   onClick={() =>
@@ -837,7 +902,7 @@ const getPdfUrlToView = () => {
                     </div>
 
                     {/* Track File Input */}
-                    <div className="border-2 border-dashed border-blue-200 rounded-lg p-3 text-center bg-blue-50/30 relative hover:bg-blue-50 transition cursor-pointer">
+                    {/* <div className="border-2 border-dashed border-blue-200 rounded-lg p-3 text-center bg-blue-50/30 relative hover:bg-blue-50 transition cursor-pointer">
                       <input
                         type="file"
                         accept=".pdf,.docx"
@@ -852,7 +917,7 @@ const getPdfUrlToView = () => {
                           ? `📄 ${trackFile.name}`
                           : "Select Track Changes File"}
                       </p>
-                    </div>
+                    </div> */}
 
                     {/* Comment Input */}
                     <textarea
@@ -864,15 +929,16 @@ const getPdfUrlToView = () => {
                     />
 
                     {/* Upload Button */}
+                    {/* Upload Button */}
                     <button
                       onClick={handleUploadCorrection}
-                      disabled={!uploadedFile || !trackFile || isUploading}
+                      disabled={!uploadedFile || isUploading}
                       className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-2
-      ${
-        !uploadedFile || !trackFile
-          ? "bg-gray-300 cursor-not-allowed"
-          : "bg-blue-600 hover:bg-blue-700 active:scale-95"
-      }`}
+  ${
+    !uploadedFile
+      ? "bg-gray-300 cursor-not-allowed"
+      : "bg-blue-600 hover:bg-blue-700 active:scale-95"
+  }`}
                     >
                       {isUploading
                         ? "Processing Diff..."
@@ -919,6 +985,15 @@ const getPdfUrlToView = () => {
                           <p className="text-xs text-gray-600 italic mb-2">
                             "{log.comments || "No comments provided"}"
                           </p>
+
+                          <button
+                            onClick={() =>
+                              handleViewVisualDiff(log.id || log._id)
+                            }
+                            className="w-full mb-2 flex items-center justify-center gap-2 text-[10px] font-bold text-white bg-purple-600 hover:bg-purple-700 px-2 py-1.5 rounded shadow transition"
+                          >
+                            <span>🔍</span> View Visual Diff (Red/Green)
+                          </button>
                           {/* ✅ Added: Download Button for PDF Report */}
 
                           <button

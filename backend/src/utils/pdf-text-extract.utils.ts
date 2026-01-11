@@ -124,3 +124,5 @@ export async function extractPlainText(pdfPath: string): Promise<string> {
   
   return plainText.trim();
 }
+
+

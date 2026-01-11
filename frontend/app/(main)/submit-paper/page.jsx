@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 // 1. Toastify imports
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
+import ReCAPTCHA from "react-google-recaptcha"; // ✅ New Import
 export default function SubmitPaperPage() {
   const getWordCount = (text) => {
     return text.trim().length === 0 ? 0 : text.trim().split(/\s+/).length;
@@ -37,6 +37,11 @@ export default function SubmitPaperPage() {
 
   const [formData, setFormData] = useState(initialFormState);
   const [keywordInput, setKeywordInput] = useState("");
+  const [captchaToken, setCaptchaToken] = useState(null); // ✅ Captcha State
+
+  const handleCaptchaChange = (token) => {
+    setCaptchaToken(token); // ✅ Token set karo
+  };
 
   // --- LOGIN CHECK & AUTOFILL ---
   useEffect(() => {
@@ -165,6 +170,10 @@ export default function SubmitPaperPage() {
       return;
     }
 
+    // ✅ Ye naya block add kiya hai confirmation ke liye
+    const isConfirmed = window.confirm("Are you sure you want to submit this article?");
+    if (!isConfirmed) return; // Agar user Cancel karega to yahi ruk jayega
+
     setIsLoading(true);
     setStatus({ type: "", message: "" });
 
@@ -197,6 +206,7 @@ export default function SubmitPaperPage() {
       if (formData.authorImage) {
         data.append("thumbnail", formData.authorImage);
       }
+      data.append("recaptchaToken", captchaToken);
 
       const token = localStorage.getItem("authToken");
       const API_URL =
@@ -970,6 +980,10 @@ export default function SubmitPaperPage() {
                 </div>
               )}
 
+
+
+              
+
               {currentStep === totalSteps ? (
                 <div className="mt-5 sm:mt-6 lg:mt-8 pt-4 sm:pt-5 lg:pt-6 border-t border-gray-200 space-y-3 sm:space-y-4">
                   <button
@@ -980,6 +994,14 @@ export default function SubmitPaperPage() {
                   >
                     Previous
                   </button>
+
+                  <div className="mt-4 flex justify-center sm:justify-start">
+                  <ReCAPTCHA
+                    sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+                    onChange={handleCaptchaChange}
+                  />
+                </div>
+                ``
                   <button
                     type="submit"
                     disabled={isLoading}
