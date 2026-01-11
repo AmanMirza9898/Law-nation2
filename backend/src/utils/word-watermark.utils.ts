@@ -3,14 +3,19 @@ import path from 'path';
 import { Document, Packer, Paragraph, TextRun, AlignmentType, Header, ExternalHyperlink, ImageRun } from 'docx';
 import { createRequire } from 'module';
 
-// Create require for CommonJS modules
+// Create require for CommonJS modules (mammoth)
 const require = createRequire(import.meta.url);
 
 /**
- * Add watermark to Word document
- * @param wordPath - Path to Word document
- * @param watermarkData - Data to include in watermark
- * @returns Buffer containing watermarked Word document
+ * Helper function to safely resolve file path
+ * Handles both relative paths and absolute Windows paths
+ */
+function resolveFilePath(filePath: string): string {
+  return path.isAbsolute(filePath) ? filePath : path.join(process.cwd(), filePath);
+}
+
+/**
+ * Add watermark to Word document (simple version - returns original for now)
  */
 export async function addWatermarkToWord(
   wordPath: string,
@@ -25,25 +30,15 @@ export async function addWatermarkToWord(
   try {
     console.log(`💧 [Word Watermark] Adding watermark to: ${wordPath}`);
     
-    const fullPath = path.join(process.cwd(), wordPath);
+    const fullPath = resolveFilePath(wordPath);
+    console.log(`📂 [Word Watermark] Resolved full path: ${fullPath}`);
     
     // Read the original Word file
     const originalBuffer = await fs.readFile(fullPath);
     
-    // Parse the original document using docx library
-    // Note: docx library doesn't support reading existing documents directly
-    // So we'll create a new document with watermark header
-    
-    // For now, we'll add watermark as a header/footer
-    // A more advanced solution would use docx-templates or mammoth
-    
     const watermarkText = `Downloaded by: ${watermarkData.userName} | Date: ${watermarkData.downloadDate.toLocaleDateString()} | Article: ${watermarkData.articleTitle}`;
     
     console.log(`💧 [Word Watermark] Watermark text: ${watermarkText}`);
-    
-    // Since we can't easily modify existing Word docs with docx library,
-    // we'll return the original with a simple text-based watermark approach
-    // For production, consider using docx-templates or officegen
     
     console.log(`⚠️ [Word Watermark] Note: Full Word watermarking requires additional libraries`);
     console.log(`💡 [Word Watermark] Returning original document for now`);
@@ -77,7 +72,8 @@ export async function addSimpleWatermarkToWord(
   try {
     console.log(`💧 [Word Watermark] Adding watermark with logo to: ${wordPath}`);
     
-    const fullPath = path.join(process.cwd(), wordPath);
+    const fullPath = resolveFilePath(wordPath);
+    console.log(`📂 [Word Watermark] Resolved full path: ${fullPath}`);
     
     // Read the original Word file
     const originalBuffer = await fs.readFile(fullPath);
@@ -140,7 +136,7 @@ export async function addSimpleWatermarkToWord(
       );
     }
     
-    // Add text watermark
+    // Add text watermark to header
     headerChildren.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
@@ -176,7 +172,7 @@ export async function addSimpleWatermarkToWord(
             }),
           },
           children: [
-            // Add watermark at top
+            // Top watermark section
             new Paragraph({
               alignment: AlignmentType.CENTER,
               children: [
@@ -208,7 +204,6 @@ export async function addSimpleWatermarkToWord(
                 }),
               ],
             }),
-            // Add clickable link
             new Paragraph({
               alignment: AlignmentType.CENTER,
               children: [
@@ -241,14 +236,14 @@ export async function addSimpleWatermarkToWord(
             }),
             new Paragraph({ text: "" }), // Empty line
             
-            // Add original content
+            // Original content (simple paragraph split)
             ...originalText.split('\n\n').map((paragraph: string) => 
               new Paragraph({
                 children: [new TextRun(paragraph.trim())],
               })
             ),
             
-            // Add watermark at bottom
+            // Bottom watermark section
             new Paragraph({ text: "" }), // Empty line
             new Paragraph({
               alignment: AlignmentType.CENTER,
@@ -281,7 +276,6 @@ export async function addSimpleWatermarkToWord(
                 }),
               ],
             }),
-            // Add clickable link at bottom
             new Paragraph({
               alignment: AlignmentType.CENTER,
               children: [
@@ -329,8 +323,8 @@ export async function addSimpleWatermarkToWord(
     console.error('❌ [Word Watermark] Failed to add watermark:', error);
     console.error('❌ [Word Watermark] Falling back to original document');
     
-    // Fallback: return original document
-    const fullPath = path.join(process.cwd(), wordPath);
-    return await fs.readFile(fullPath);
+    // Safe fallback with proper path resolution
+    const fallbackPath = resolveFilePath(wordPath);
+    return await fs.readFile(fallbackPath);
   }
 }
