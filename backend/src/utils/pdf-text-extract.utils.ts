@@ -2,8 +2,22 @@ import * as pdfjsLib from 'pdfjs-dist';
 import fs from 'fs';
 import path from 'path';
 
-// Disable worker for Node.js environment
-pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+try {
+  // Try to find the worker file in node_modules
+  const workerPath = path.join(process.cwd(), 'node_modules', 'pdfjs-dist', 'build', 'pdf.worker.mjs');
+  if (fs.existsSync(workerPath)) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath;
+    console.log(`✅ [PDF.js] Worker configured: ${workerPath}`);
+  } else {
+    // Fallback: use empty string to disable worker for Node.js
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+    console.log(`⚠️ [PDF.js] Worker disabled (fallback mode)`);
+  }
+} catch (error) {
+  // Final fallback: use empty string to disable worker
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+  console.log(`⚠️ [PDF.js] Worker setup failed, using fallback mode:`, error);
+}
 
 /**
  * Word position information
