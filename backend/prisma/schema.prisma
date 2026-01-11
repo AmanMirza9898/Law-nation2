@@ -107,11 +107,7 @@ model Article {
   secondAuthorPhone        String?
   secondAuthorOrganization String?
   title              String
-<<<<<<< HEAD
-  slug               String         @unique
-=======
   slug               String                  @unique
->>>>>>> f853872e2a9677d1ec5d4a18c9f0659e8f324659
   category           String
   abstract           String
   keywords           String?

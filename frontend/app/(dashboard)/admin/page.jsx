@@ -178,22 +178,16 @@ export default function AdminDashboard() {
     }
   };
 
-  // ✅ NEW: Download Diff PDF for Admin
-  // ✅ REPLACE: handleDownloadDiffPdf with this universal function
-  const handleDownloadAdminReport = async (
-    changeLogId,
-    type,
-    format = "pdf"
-  ) => {
+  const handleDownloadAdminReport = async (changeLogId, type, format = "pdf") => {
     try {
       const token = localStorage.getItem("adminToken");
-      const articleId = selectedArticle.id || selectedArticle._id;
 
-      // Backend dev ki di hui documentation ke hisaab se endpoints
+      // ✅ Backend Controller ke hisab se Sahi Routes
+      // Route structure assumption: /api/articles/change-logs/:changeLogId/...
       const endpoint =
         type === "diff"
-          ? `${API_BASE_URL}/api/articles/${articleId}/change-log/${changeLogId}/download-diff?format=${format}`
-          : `${API_BASE_URL}/api/articles/change-logs/${changeLogId}/editor-document?format=${format}`;
+          ? `${API_BASE_URL}/api/articles/:id/change-log/:changeLogId/download-diff?format=${format}`
+          : `${API_BASE_URL}/api/articles/change-logs/:changeLogId/editor-document?format=${format}`;
 
       toast.info(`Generating ${format.toUpperCase()}...`);
 
@@ -208,15 +202,15 @@ export default function AdminDashboard() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${type}-v${articleId}.${
-        format === "word" ? "docx" : "pdf"
-      }`;
+      // Filename backend headers se aayega, but fallback ke liye:
+      a.download = `${type}-${changeLogId}.${format === "word" ? "docx" : "pdf"}`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       toast.success("Download Successful!");
     } catch (err) {
-      toast.error("Format conversion not supported for this file yet.");
+      console.error(err);
+      toast.error("Download failed or format not supported.");
     }
   };
 
@@ -332,7 +326,8 @@ export default function AdminDashboard() {
             title: item.title,
             author: item.authorName || "Unknown",
             status: mapBackendStatus(item.status),
-            assignedTo: item.assignedEditorId || "",
+            // ✅ Backend se 'assignedEditor' object aata hai, humein uski ID chahiye dropdown ke liye
+assignedTo: item.assignedEditor?.id || item.assignedEditorId || "",
             date: new Date(item.createdAt).toLocaleDateString("en-GB"),
             abstract: item.abstract,
 
@@ -394,38 +389,48 @@ export default function AdminDashboard() {
   const [showAbstract, setShowAbstract] = useState(null);
 
   // ✅ ASSIGN LOGIC
+ // ✅ ASSIGN LOGIC (Fixed: Handles "Already Assigned" error correctly)
   const assignArticle = async (articleId, editorId) => {
     if (!editorId) return;
 
     try {
-      // 1. Token yahan define karna zaroori hai
       const token = localStorage.getItem("adminToken");
-
       const response = await fetch(
         `${API_BASE_URL}/api/articles/${articleId}/assign-editor`,
         {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`, // Ab ye error nahi dega
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ editorId: editorId }),
         }
       );
 
+      // 1. Pehle Response ka Data Parse karo
+      const data = await response.json();
+
       if (response.ok) {
-        // UI Update: Status ko 'In Review' aur editor ID set karo
+        // 2. Success Case: State Update karo aur Success Toast dikhao
         setArticles((prev) =>
           prev.map((a) =>
             a.id === articleId
-              ? { ...a, assignedTo: editorId, status: "In Review" }
+              ? {
+                  ...a,
+                  assignedTo: editorId,
+                  status: "In Review", // Immediate visual feedback
+                }
               : a
           )
         );
-        toast.success("Assigned to editor successfully!");
+        toast.success(data.message || "Editor assigned successfully!");
       } else {
-        const errorData = await response.json();
-        toast.error(errorData.message || "Failed to assign editor");
+        // 3. Error Case (Jaha "Already Assigned" pakda jayega)
+        // Backend se jo message aaya hai (e.g. "Article is already assigned...") wo yahan dikhega
+        toast.error(data.message || "Failed to assign editor");
+        
+        // Optional: UI ko refresh kar sakte ho taaki purana editor wapis dikh jaye
+        // fetchDashboardData(); 
       }
     } catch (error) {
       console.error("Error assigning:", error);

@@ -106,28 +106,6 @@ async function findUserById(id: string, currentUser?: AuthUser) {
 /**
  * List all users who have the 'editor' role
  */
-<<<<<<< HEAD
-// async function listEditors() {
-//   const editors = await prisma.user.findMany({
-//     where: {
-//       roles: {
-//         some: {
-//           role: {
-//             name: "editor"
-//           }
-//         }
-//       }
-//     },
-//     select: {
-//       id: true,
-//       name: true,
-//       email: true,
-//     },
-//     orderBy: {
-//       createdAt: "desc"
-//     }
-//   });
-=======
 async function listEditors() {
   const editors = await prisma.user.findMany({
     where: {
@@ -148,10 +126,9 @@ async function listEditors() {
       createdAt: "desc",
     },
   });
->>>>>>> f853872e2a9677d1ec5d4a18c9f0659e8f324659
 
-//   return editors;
-// }
+  return editors;
+}
 
 /**
  * Invite an editor - sends invitation email with password setup link
@@ -254,28 +231,4 @@ async function inviteEditor(
     message: `Invitation sent to ${email}. The editor has 48 hours to set up their password.`,
     expiresAt,
   };
-}
-/**
- * ✅ YE NAYA FUNCTION SABSE NEECHE ADD KARO
- * List all users who have the 'editor' role
- */
-async function listEditors() {
-  const editors = await prisma.user.findMany({
-    where: {
-      roles: {
-        some: {
-          role: {
-            name: "editor" // Role name match kar rahe hain
-          }
-        }
-      }
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-    }
-  });
-
-  return editors;
 }
