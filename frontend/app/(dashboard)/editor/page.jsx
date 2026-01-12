@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
+import ReviewInterface from "./ReviewInterface";
 
 // ... existing imports ...
 
@@ -839,250 +840,24 @@ export default function EditorDashboard() {
             </>
           )}
 
-          {/* VIEW 2: ARTICLE REVIEW INTERFACE */}
           {selectedArticle && (
-            <div className="flex flex-col lg:flex-row gap-6 h-auto lg:h-full">
-              {/* PDF VIEWER SECTION */}
-              <div className="flex-1 bg-gray-100 rounded-xl border border-gray-300 p-4 flex flex-col h-[500px] lg:h-auto min-h-[500px]">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-bold text-gray-700 uppercase text-sm md:text-base">
-                    {pdfViewMode === "original"
-                      ? " Original Submission"
-                      : " Latest Edited Version"}
-                  </h3>
-                  {getPdfUrlToView() && (
-                    <a
-                      href={getPdfUrlToView()}
-                      target="_blank"
-                      className="text-xs text-blue-600 hover:underline"
-                    >
-                      Open in New Tab ↗
-                    </a>
-                  )}
-                </div>
-
-                <div className="flex-1 bg-white rounded-lg shadow-inner flex items-center justify-center border-2 border-dashed border-gray-300 relative overflow-hidden">
-                  {getPdfUrlToView() ? (
-                    <iframe
-                      src={getPdfUrlToView()}
-                      className="w-full h-full absolute inset-0"
-                      title="PDF Viewer"
-                    />
-                  ) : (
-                    <div className="text-center text-gray-400">
-                      <p className="text-4xl mb-2">📄</p>
-                      <p>PDF not available for this version</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* ACTION PANEL (Right Side on Desktop, Bottom on Mobile) */}
-
-              {/* ACTION PANEL (Right Side) */}
-              <div className="w-full lg:w-[350px] space-y-6 shrink-0 h-full overflow-y-auto pb-10">
-                {/* 1. UPLOAD SECTION */}
-                {/* 1. UPLOAD SECTION */}
-                <div className="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
-                  <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                    Upload Correction
-                  </h3>
-
-                  <div className="space-y-3">
-                    {/* Corrected File Input */}
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center bg-gray-50 relative hover:bg-gray-100 transition cursor-pointer">
-                      <input
-                        type="file"
-                        accept=".pdf,.docx"
-                        onChange={(e) => setUploadedFile(e.target.files[0])}
-                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                      />
-                      <p className="text-[10px] font-bold text-gray-500 uppercase">
-                        CORRECTED FILE
-                      </p>
-                      <p className="text-xs truncate font-medium text-gray-700">
-                        {uploadedFile
-                          ? `📄 ${uploadedFile.name}`
-                          : "Select Corrected Version"}
-                      </p>
-                    </div>
-
-                    {/* Track File Input */}
-                    {/* <div className="border-2 border-dashed border-blue-200 rounded-lg p-3 text-center bg-blue-50/30 relative hover:bg-blue-50 transition cursor-pointer">
-                      <input
-                        type="file"
-                        accept=".pdf,.docx"
-                        onChange={(e) => setTrackFile(e.target.files[0])}
-                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                      />
-                      <p className="text-[10px] font-bold text-blue-600 uppercase">
-                        TRACK FILE (CHANGES)
-                      </p>
-                      <p className="text-xs truncate font-medium text-blue-800">
-                        {trackFile
-                          ? `📄 ${trackFile.name}`
-                          : "Select Track Changes File"}
-                      </p>
-                    </div> */}
-
-                    {/* Comment Input */}
-                    <textarea
-                      className="w-full p-2 text-sm border rounded bg-gray-50 focus:ring-2 ring-red-200 outline-none resize-none mt-2"
-                      rows="2"
-                      placeholder="Describe changes (e.g. Fixed typos on pg 2)..."
-                      value={uploadComment}
-                      onChange={(e) => setUploadComment(e.target.value)}
-                    />
-
-                    {/* Upload Button */}
-                    {/* Upload Button */}
-                    <button
-                      onClick={handleUploadCorrection}
-                      disabled={!uploadedFile || isUploading}
-                      className={`w-full py-2.5 text-sm font-bold rounded-lg shadow-sm transition text-white mt-2
-  ${
-    !uploadedFile
-      ? "bg-gray-300 cursor-not-allowed"
-      : "bg-blue-600 hover:bg-blue-700 active:scale-95"
-  }`}
-                    >
-                      {isUploading
-                        ? "Processing Diff..."
-                        : "Upload & Generate Diff"}
-                    </button>
-                  </div>
-                </div>
-
-                {/* 2. APPROVE BUTTON */}
-                <button
-                  onClick={handleEditorApprove}
-                  className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 shadow-lg transition flex items-center justify-center gap-2 transform active:scale-95"
-                >
-                  <CheckCircleIcon /> Approve & Notify Admin
-                </button>
-
-                {/* 3. CHANGE HISTORY LIST (Dynamic) */}
-                <div className="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
-                  <h3 className="font-bold text-gray-800 mb-4 border-b pb-2">
-                    Change History
-                  </h3>
-
-                  <div className="space-y-6">
-                    {changeHistory.length === 0 ? (
-                      <p className="text-sm text-gray-400 text-center py-2">
-                        No edits made yet.
-                      </p>
-                    ) : (
-                      changeHistory.map((log, index) => (
-                        <div
-                          key={log.id}
-                          className="relative pl-4 border-l-2 border-gray-200"
-                        >
-                          {/* Timeline Dot */}
-                          <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-blue-500 ring-4 ring-white"></div>
-                          <div className="mb-1">
-                            <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                              Version {log.versionNumber}
-                            </span>
-                            <span className="text-[10px] text-gray-400 ml-2">
-                              {new Date(log.editedAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                          <p className="text-xs text-gray-600 italic mb-2">
-                            "{log.comments || "No comments provided"}"
-                          </p>
-
-                          {/* <button
-                            onClick={() =>
-                              handleViewVisualDiff(log.id || log._id)
-                            }
-                            className="w-full mb-2 flex items-center justify-center gap-2 text-[10px] font-bold text-white bg-purple-600 hover:bg-purple-700 px-2 py-1.5 rounded shadow transition"
-                          >
-                            <span>🔍</span> View Visual Diff (Red/Green)
-                          </button> */}
-                          {/* ✅ Added: Download Button for PDF Report */}
-
-                          <button
-                            onClick={
-                              () =>
-                                handleDownloadDiffReport(
-                                  log.id || log._id,
-                                  "pdf"
-                                ) // ✅ handleDownloadDiffReport use karein
-                            }
-                            className="mb-2 flex items-center text-[10px] font-bold text-red-600 hover:text-red-800 bg-red-50 px-2 py-1 rounded border border-red-100 transition"
-                          >
-                            <DownloadIcon /> Download PDF Report
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleDownloadDiffReport(
-                                log.id || log._id,
-                                "word"
-                              )
-                            }
-                            className="flex items-center text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-100 transition"
-                          >
-                            <WordIcon /> Download Word Report
-                          </button>
-                          {/* Render Diff Viewer Component here */}
-                          <DiffViewer diffData={log.diffData} />
-                        </div>
-                      ))
-                    )}
-
-                    {/* Original Submission Marker */}
-                    <div className="relative pl-4 border-l-2 border-gray-200 opacity-60">
-                      <div className="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-gray-400 ring-4 ring-white"></div>
-                      <p className="text-xs font-bold text-gray-500">
-                        Original Submission
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 4. SOURCE FILES (Existing buttons moved here) */}
-                <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                  <h3 className="font-bold text-gray-800 mb-4">Source Files</h3>
-                  <div className="flex flex-col gap-3">
-                    {selectedArticle.originalWordUrl ? (
-                      <button
-                        onClick={() =>
-                          handleDownloadFile(
-                            selectedArticle.originalWordUrl,
-                            selectedArticle.title,
-                            "Word"
-                          )
-                        }
-                        className="flex items-center justify-center w-full py-2 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold rounded-lg hover:bg-blue-100 transition"
-                      >
-                        <WordIcon /> Download Word
-                      </button>
-                    ) : (
-                      <div className="text-xs text-center text-gray-400">
-                        No Word file
-                      </div>
-                    )}
-
-                    {selectedArticle.originalPdfUrl && (
-                      <button
-                        onClick={() =>
-                          handleDownloadFile(
-                            selectedArticle.originalPdfUrl,
-                            selectedArticle.title,
-                            "PDF"
-                          )
-                        }
-                        className="flex items-center justify-center w-full py-2 bg-red-50 text-red-700 border border-red-200 text-xs font-bold rounded-lg hover:bg-red-100 transition"
-                      >
-                        <DownloadIcon /> Download PDF
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+  <ReviewInterface
+    selectedArticle={selectedArticle}
+    pdfViewMode={pdfViewMode}
+    getPdfUrlToView={getPdfUrlToView}
+    uploadedFile={uploadedFile}
+    setUploadedFile={setUploadedFile}
+    uploadComment={uploadComment}
+    setUploadComment={setUploadComment}
+    isUploading={isUploading}
+    handleUploadCorrection={handleUploadCorrection}
+    handleEditorApprove={handleEditorApprove}
+    changeHistory={changeHistory}
+    handleViewVisualDiff={handleViewVisualDiff}
+    handleDownloadDiffReport={handleDownloadDiffReport}
+    handleDownloadFile={handleDownloadFile}
+  />
+)}
         </div>
       </main>
     </div>
