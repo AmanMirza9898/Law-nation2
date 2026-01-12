@@ -104,45 +104,76 @@ export default function SubmitPaperPage() {
   };
 
   const handleNext = () => {
+    // ✅ Zod Schema: /^[a-zA-Z\s]+$/ (Only letters & space)
+    const nameRegex = /^[a-zA-Z\s]+$/;
+    
+    // ✅ Zod Schema: /^[a-zA-Z\s\-:,.'&()]+$/ (Letters, space, basic punctuation. NO NUMBERS)
+    const titleRegex = /^[a-zA-Z\s\-:,.'&()]+$/; 
+
     if (currentStep === 1) {
-      // 1. Primary Author Check (Existing)
+      // 1. Primary Author Check
       if (!formData.fullName || !formData.email) {
         toast.error("Please fill in all mandatory author details.");
         return;
       }
 
-      // 2. Second Author Partial Check (NEW - Recommended)
-      // Agar ek bhara hai aur dusra khaali hai, to rok do
+      // Check Primary Author Name Regex
+      if (!nameRegex.test(formData.fullName)) {
+        toast.error("Author name must contain only letters and spaces (No numbers or special characters).");
+        return;
+      }
+
+      // 2. Second Author Partial Check (Refinement Logic)
       if (
         (formData.secondAuthorName && !formData.secondAuthorEmail) ||
         (!formData.secondAuthorName && formData.secondAuthorEmail)
       ) {
         toast.error(
-          "Please provide both Name and Email for the Second Author (or leave both empty)."
+          "Both Name and Email are required for the Second Author (or leave both empty)."
         );
+        return;
+      }
+      
+      // Check Second Author Name Regex (if exists)
+      if (formData.secondAuthorName && !nameRegex.test(formData.secondAuthorName)) {
+        toast.error("Second Author name must contain only letters and spaces.");
         return;
       }
     }
 
     if (currentStep === 2) {
-      // 1. Title Validation (Min 50 Characters)
+      // 1. Title Length Validation (Min 50, Max 100)
       if (!formData.articleTitle || formData.articleTitle.length < 50) {
         toast.error(
           `Title is too short! Current: ${formData.articleTitle.length}. Minimum required: 50 characters.`
         );
         return;
       }
+      if (formData.articleTitle.length > 100) {
+        toast.error("Title must not exceed 100 characters.");
+        return;
+      }
 
-      // 2. Description Validation (Min 50 Characters)
-      // Max 500 ka check zaroori nahi kyunki HTML user ko likhne hi nahi dega
+      // 2. Title Regex Validation (Strict Zod Match)
+      if (!titleRegex.test(formData.articleTitle)) {
+        toast.error("Title can only contain letters and basic punctuation (- : , . ' & ( )). Numbers are not allowed.");
+        return;
+      }
+
+      // 3. Abstract Validation (Min 50, Max 500)
       if (
         !formData.detailedDescription ||
         formData.detailedDescription.length < 50
       ) {
         toast.error(
-          `Description is too short! Current: ${formData.detailedDescription.length} chars. Minimum required: 50.`
+          `Abstract is too short! Current: ${formData.detailedDescription.length} chars. Minimum required: 50.`
         );
         return;
+      }
+      // Max 500 is handled by HTML maxLength, but good to check logic
+      if (formData.detailedDescription.length > 500) {
+         toast.error("Abstract must not exceed 500 characters.");
+         return;
       }
     }
 
@@ -160,7 +191,7 @@ export default function SubmitPaperPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validation
+    // Basic Validations
     if (!formData.file || !formData.contentFormat) {
       toast.error("Please select a content format and upload a PDF file.");
       return;
@@ -171,9 +202,8 @@ export default function SubmitPaperPage() {
       return;
     }
 
-    // ✅ Ye naya block add kiya hai confirmation ke liye
-    const isConfirmed = window.confirm("Are you sure you want to submit this article?");
-    if (!isConfirmed) return; // Agar user Cancel karega to yahi ruk jayega
+    // const isConfirmed = window.confirm("Are you sure you want to submit this article?");
+    // if (!isConfirmed) return;
 
     setIsLoading(true);
     setStatus({ type: "", message: "" });
@@ -181,7 +211,7 @@ export default function SubmitPaperPage() {
     try {
       const data = new FormData();
 
-      // Basic Fields
+      // Fields Mapping
       const finalAuthorName =
         formData.authorDeclaration === "other" &&
         formData.submissionOnBehalfName
@@ -190,7 +220,7 @@ export default function SubmitPaperPage() {
           
       data.append("authorName", finalAuthorName);
       data.append("authorEmail", formData.email);
-      data.append("authorPhone", formData.phone);
+      data.append("authorPhone", formData.phone || ""); // Optional handle
       
       if (formData.secondAuthorName)
         data.append("secondAuthorName", formData.secondAuthorName);
@@ -200,9 +230,12 @@ export default function SubmitPaperPage() {
       data.append("title", formData.articleTitle);
       data.append("category", formData.contentFormat);
       data.append("abstract", formData.detailedDescription);
-      data.append("keywords", formData.keywords.join(", "));
+      
+      // Keywords handle
+      if (formData.keywords && formData.keywords.length > 0) {
+        data.append("keywords", formData.keywords.join(", "));
+      }
 
-      // PDF and Image
       data.append("pdf", formData.file);
       if (formData.authorImage) {
         data.append("thumbnail", formData.authorImage);
@@ -223,36 +256,23 @@ export default function SubmitPaperPage() {
 
       const result = await response.json();
 
-      // --- 👇 ERROR HANDLING FIX ---
+      // --- 👇 ERROR HANDLING (Backend Error Ignore & Show Custom Msg) ---
       if (!response.ok) {
-        // Step 1: Variable declare karo
-        let errorMessage = "Submission failed"; 
-
-        // Step 2: Check karo ki error Array hai ya Object
-        if (Array.isArray(result) && result.length > 0 && result[0].message) {
-          errorMessage = result[0].message; // Screenshot wala case
-        } 
-        else if (result.message) {
-           errorMessage = typeof result.message === 'string' ? result.message : JSON.stringify(result.message);
-        }
-        else if (result.error) {
-           errorMessage = result.error;
-        }
-
-        // Step 3: Error throw karo (sirf tab jab response ok na ho)
-        throw new Error(errorMessage); 
+        // Backend ka asli error console me dekho developer ke liye
+        console.error("Backend Validation Error:", result);
+        
+        // User ko sirf ye dikhao:
+        throw new Error("Submission failed. Please ensure all details comply with the guidelines."); 
       }
-      // -----------------------------
+      // ----------------------------------------------------------------
 
-      // Success Logic (Ye ab safe hai)
+      // Success Logic
       if (result.requiresVerification) {
         toast.info("Verification code sent to your email.");
         setShowVerification(true);
         setPendingArticleId(result.articleId);
       } else {
         setShowSuccessModal(true);
-
-        // Reset Form
         setFormData(initialFormState);
         setCurrentStep(1);
         if (fileInputRef.current) fileInputRef.current.value = "";
@@ -261,11 +281,8 @@ export default function SubmitPaperPage() {
       }
     } catch (error) {
       console.error("Error:", error);
-      setStatus({
-        type: "error",
-        message: error.message || "Something went wrong.",
-      });
-      toast.error(error.message || "Something went wrong.");
+      // Toast me backend ka error message nahi jayega, apna custom jayega
+      toast.error(error.message || "Something went wrong. Please try again.");
     } finally {
       setIsLoading(false);
     }

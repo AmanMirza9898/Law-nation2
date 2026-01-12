@@ -14,7 +14,7 @@ function SetupForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   
-  // Backend URL (Make sure this matches your server port)
+  // Backend URL
   const API_BASE_URL = "http://localhost:4000";
 
   // Agar URL mein token nahi hai
@@ -30,13 +30,14 @@ function SetupForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // 1. Client Side Validation
-    if (password.length < 6) {
-      toast.error("Password must be at least 6 characters long");
+    // 1. Validation Update: 8 Characters Check
+    if (password.length < 8) {
+      toast.error("Password must be at least 8 characters long.");
       return;
     }
+
     if (password !== confirmPassword) {
-      toast.error("Passwords do not match!");
+      toast.error("Passwords do not match. Please try again.");
       return;
     }
 
@@ -53,22 +54,25 @@ function SetupForm() {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        toast.success("Password set successfully!");
+        toast.success("Password set successfully! Redirecting...");
         
-        // 🚨 3. REDIRECT FIX: Saara purana local storage saaf karein
+        // Storage Clear
         localStorage.clear(); 
         sessionStorage.clear();
 
-        // 4. Forceful Redirect to Login Page
+        // 👇 REDIRECT UPDATE: Ab ye management-login par jayega
         setTimeout(() => {
-          window.location.href = "/law/admin-login"; 
+          window.location.href = "/management-login"; 
         }, 2000);
+
       } else {
-        toast.error(data.message || "Link expired or invalid");
+        // Error Handling
+        console.error("Backend Error:", data.message);
+        toast.error("Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)");
       }
     } catch (error) {
       console.error("Setup Password Error:", error);
-      toast.error("Server error. Please try again.");
+      toast.error("Something went wrong. Please check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -80,7 +84,7 @@ function SetupForm() {
       <div className="p-8 text-center border-b border-gray-100">
         <h1 className="text-3xl font-black italic tracking-tighter text-red-700">LAW NATION</h1>
         <p className="text-gray-500 text-sm mt-2 font-medium">Secure your account</p>
-        <p className="text-red-500">Password must be 8 characters</p>
+        <p className="text-red-500 text-xs mt-1 font-semibold">Password must be at least 8 characters</p>
       </div>
 
       {/* Form Section */}
@@ -130,7 +134,7 @@ function SetupForm() {
 export default function SetupPasswordPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-      <ToastContainer position="top-center" autoClose={2000} theme="colored" />
+      <ToastContainer position="top-center" autoClose={3000} theme="colored" />
       <Suspense fallback={<div className="text-gray-500 font-bold text-sm">Loading Interface...</div>}>
         <SetupForm />
       </Suspense>
