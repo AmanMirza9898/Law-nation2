@@ -11,14 +11,22 @@ const require = createRequire(import.meta.url);
 const docxPdf = require('docx-pdf');
 const convertDocxToPdfAsync = promisify(docxPdf);
 
-// Supabase client for uploading converted files
+// Supabase client for uploading converted files (production only)
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || '';
 const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || 'Articles';
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
-const supabase = SUPABASE_URL && SUPABASE_KEY 
+const supabase = SUPABASE_URL && SUPABASE_KEY && NODE_ENV === 'production'
   ? createClient(SUPABASE_URL, SUPABASE_KEY)
   : null;
+
+/**
+ * Check if we should use local storage (development) or cloud storage (production)
+ */
+function useLocalStorage(): boolean {
+  return NODE_ENV === 'development' || NODE_ENV === 'local' || !supabase;
+}
 
 /**
  * Check if a path is a URL
@@ -47,7 +55,50 @@ async function downloadFile(url: string, extension: string): Promise<string> {
 }
 
 /**
- * Upload file to Supabase storage
+ * Save converted file locally (development) or upload to Supabase (production)
+ */
+async function saveConvertedFile(
+  localFilePath: string,
+  originalUrl: string,
+  targetExtension: string
+): Promise<string> {
+  if (useLocalStorage()) {
+    // Development: Save to local uploads directory
+    console.log(`💾 [Local] Saving converted file locally`);
+    
+    const uploadsDir = path.join(process.cwd(), 'uploads');
+    const pdfsDir = path.join(uploadsDir, 'pdfs');
+    const wordsDir = path.join(uploadsDir, 'words');
+    
+    // Ensure directories exist
+    await fs.mkdir(uploadsDir, { recursive: true });
+    await fs.mkdir(pdfsDir, { recursive: true });
+    await fs.mkdir(wordsDir, { recursive: true });
+    
+    // Generate unique filename
+    const timestamp = Date.now();
+    const randomId = Math.floor(Math.random() * 1000000);
+    const fileName = `${timestamp}-${randomId}${targetExtension}`;
+    
+    const targetDir = targetExtension === '.pdf' ? pdfsDir : wordsDir;
+    const targetPath = path.join(targetDir, fileName);
+    
+    // Copy converted file to uploads directory
+    await fs.copyFile(localFilePath, targetPath);
+    
+    // Return relative path for local development
+    const relativePath = `/uploads/${targetExtension === '.pdf' ? 'pdfs' : 'words'}/${fileName}`;
+    console.log(`✅ [Local] Saved to: ${relativePath}`);
+    
+    return relativePath;
+  } else {
+    // Production: Upload to Supabase
+    return await uploadToSupabase(localFilePath, originalUrl);
+  }
+}
+
+/**
+ * Upload file to Supabase storage (production only)
  */
 async function uploadToSupabase(
   localFilePath: string,
@@ -135,18 +186,18 @@ export async function convertWordToPdf(
     
     console.log(`✅ [Conversion] Word to PDF successful`);
     
-    // If remote, upload converted file back to Supabase
+    // Save converted file (local in development, Supabase in production)
     if (isRemote) {
-      const uploadedUrl = await uploadToSupabase(localPdfPath, wordFilePath);
+      const savedUrl = await saveConvertedFile(localPdfPath, wordFilePath, '.pdf');
       
       // Clean up temp files
       if (tempWordPath) await fs.unlink(tempWordPath).catch(() => {});
       if (tempPdfPath) await fs.unlink(tempPdfPath).catch(() => {});
       
-      return uploadedUrl;
+      return savedUrl;
     }
     
-    // Return local path
+    // Return local path for local files
     return wordFilePath.replace(/\.docx?$/i, '.pdf');
   } catch (error) {
     // Clean up temp files on error
@@ -224,18 +275,18 @@ export async function convertPdfToWord(
     
     console.log(`✅ [Conversion] PDF to Word successful`);
     
-    // If remote, upload converted file back to Supabase
+    // Save converted file (local in development, Supabase in production)
     if (isRemote) {
-      const uploadedUrl = await uploadToSupabase(localWordPath, pdfFilePath);
+      const savedUrl = await saveConvertedFile(localWordPath, pdfFilePath, '.docx');
       
       // Clean up temp files
       if (tempPdfPath) await fs.unlink(tempPdfPath).catch(() => {});
       if (tempWordPath) await fs.unlink(tempWordPath).catch(() => {});
       
-      return uploadedUrl;
+      return savedUrl;
     }
     
-    // Return local path
+    // Return local path for local files
     return pdfFilePath.replace(/\.pdf$/i, '.docx');
   } catch (error) {
     // Clean up temp files on error

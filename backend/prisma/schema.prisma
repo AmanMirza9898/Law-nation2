@@ -187,6 +187,7 @@ model ArticleChangeLog {
   fileType            String   // "PDF" or "WORD"
   diffData            Json     // {added: [], removed: [], modified: []}
   visualDiffUrl       String?  // Path to visual diff PDF with markup
+  visualDiffStatus    String   @default("PENDING") // "PENDING", "GENERATING", "READY", "FAILED"
   editedBy            String
   editedAt            DateTime @default(now())
   status              String   @default("pending") // "pending", "approved", "published"
@@ -199,6 +200,7 @@ model ArticleChangeLog {
   @@index([articleId])
   @@index([editedBy])
   @@index([status])
+  @@index([visualDiffStatus])
 }
 
 /// ---------- Notifications ----------
