@@ -140,8 +140,11 @@ function addMarkupToPage(page: PDFPage, changes: TextChange[]): void {
 /**
  * Generate visual diff from change log
  * @param changeLogId - Change log ID
+ * @param articleId - Article ID
+ * @param versionNumber - Version number
  * @param originalPdfPath - Path to original PDF
  * @param modifiedPdfPath - Path to modified PDF
+ * @param outputPath - Full path where to save the visual diff PDF
  * @returns Path to generated visual diff PDF
  */
 export async function generateVisualDiffFromChangeLog(
@@ -149,11 +152,13 @@ export async function generateVisualDiffFromChangeLog(
   articleId: string,
   versionNumber: number,
   originalPdfPath: string,
-  modifiedPdfPath: string
+  modifiedPdfPath: string,
+  outputPath: string
 ): Promise<string> {
-  // Generate output path
-  const outputFileName = `visual-diff-v${versionNumber}-${articleId}.pdf`;
-  const outputPath = path.join(process.cwd(), 'uploads', 'visual-diffs', outputFileName);
+  console.log(`🎨 [Visual Diff] Starting visual diff generation...`);
+  console.log(`📄 [Visual Diff] Original: ${originalPdfPath}`);
+  console.log(`📄 [Visual Diff] Modified: ${modifiedPdfPath}`);
+  console.log(`💾 [Visual Diff] Output: ${outputPath}`);
   
   // Generate visual diff
   return await generateVisualDiffPdf(originalPdfPath, modifiedPdfPath, outputPath);

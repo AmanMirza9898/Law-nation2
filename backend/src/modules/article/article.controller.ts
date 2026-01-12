@@ -925,7 +925,7 @@ export class ArticleController {
     }
   }
 
-  // ✅ NEW: View visual diff (Editor and Admin only)
+  // ✅ PRODUCTION-GRADE: View visual diff with proper error handling
   async viewVisualDiff(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { changeLogId } = req.params;
@@ -937,33 +937,89 @@ export class ArticleController {
       const userId = req.user!.id;
       const userRoles = req.user!.roles?.map((role: { name: string }) => role.name) || [];
 
-      // Get visual diff info
-      const result = await articleService.getVisualDiff(changeLogId, userId, userRoles);
+      console.log(`🎨 [Visual Diff] Request for change log: ${changeLogId}`);
 
-      // If visual diff doesn't exist, generate it
-      if (!result.visualDiffUrl) {
-        console.log(`🎨 [Visual Diff] Visual diff not found, generating...`);
-        const visualDiffPath = await articleService.generateVisualDiff(changeLogId);
-        result.visualDiffUrl = visualDiffPath;
+      // Step 1: Get or generate visual diff (service handles all logic)
+      let visualDiffUrl: string;
+      
+      try {
+        visualDiffUrl = await articleService.generateVisualDiff(changeLogId);
+      } catch (error: any) {
+        console.error('❌ [Visual Diff] Generation failed:', error);
+        
+        // Handle specific error cases
+        if (error.message?.includes('generation in progress')) {
+          return res.status(202).json({
+            message: 'Visual diff is being generated. Please try again in a few moments.',
+            status: 'generating'
+          });
+        }
+        
+        if (error.message?.includes('only supported for PDF files')) {
+          return res.status(400).json({
+            message: 'Visual diff is only available for PDF documents.',
+            status: 'unsupported'
+          });
+        }
+        
+        // Generic error
+        return res.status(500).json({
+          message: 'Could not generate visual diff. Please try again later.',
+          status: 'error'
+        });
       }
 
-      // Read visual diff PDF
+      // Step 2: Resolve file path using production-safe method
+      const { resolveUploadPath, fileExists, validateFile } = await import('@/utils/file-path.utils.js');
+      const fullPath = resolveUploadPath(visualDiffUrl);
+
+      // Step 3: Validate file exists and is readable
+      try {
+        await validateFile(fullPath);
+      } catch (error: any) {
+        console.error(`❌ [Visual Diff] File validation failed: ${error.message}`);
+        
+        // File is corrupted/missing, reset status for regeneration
+        await prisma.articleChangeLog.update({
+          where: { id: changeLogId },
+          data: { 
+            visualDiffStatus: 'PENDING',
+            visualDiffUrl: null 
+          },
+        });
+        
+        return res.status(404).json({
+          message: 'Visual diff file is corrupted or missing. Please try generating again.',
+          status: 'corrupted'
+        });
+      }
+
+      // Step 4: Read and serve PDF file
       const fs = await import('fs/promises');
-      const path = await import('path');
       
-      const fullPath = path.join(process.cwd(), result.visualDiffUrl);
-      const pdfBuffer = await fs.readFile(fullPath);
+      try {
+        const pdfBuffer = await fs.readFile(fullPath);
 
-      // Send PDF
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `inline; filename="visual-diff-v${result.versionNumber}.pdf"`);
-      res.setHeader('Content-Length', pdfBuffer.length);
+        // Set proper headers
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="visual-diff-${changeLogId}.pdf"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+        res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
 
-      console.log(`✅ [Visual Diff] Sending visual diff: ${result.visualDiffUrl} (${pdfBuffer.length} bytes)`);
+        console.log(`✅ [Visual Diff] Serving file: ${visualDiffUrl} (${pdfBuffer.length} bytes)`);
 
-      res.send(pdfBuffer);
+        res.send(pdfBuffer);
+      } catch (error: any) {
+        console.error(`❌ [Visual Diff] Failed to read file: ${error.message}`);
+        
+        return res.status(500).json({
+          message: 'Failed to read visual diff file.',
+          status: 'read_error'
+        });
+      }
+
     } catch (error) {
-      console.error('❌ [Visual Diff] Failed:', error);
+      console.error('❌ [Visual Diff] Unexpected error:', error);
       next(error);
     }
   }
